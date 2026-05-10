@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>Activate</key>
+		<string>Normal</string>
+		<key>CreationDate</key>
+		<real>748199916.00782895</real>
+		<key>CustomIconData</key>
+		<string>KMEP-Minus</string>
+		<key>IsActive</key>
+		<false/>
+		<key>Macros</key>
+		<array>
+			<dict>
+				<key>Actions</key>
+				<array>
+					<dict>
+						<key>ActionUID</key>
+						<integer>999330501</integer>
+						<key>MacroActionType</key>
+						<string>SelectMenuItem</string>
+						<key>Menu</key>
+						<array>
+							<string>Edit</string>
+							<string>Insert Action</string>
+							<string>By Name…</string>
+						</array>
+						<key>TargetApplication</key>
+						<dict>
+							<key>BundleIdentifier</key>
+							<string>com.stairways.keyboardmaestro.editor</string>
+							<key>Name</key>
+							<string>Keyboard Maestro</string>
+							<key>NewFile</key>
+							<string>/Applications/Keyboard Maestro.app</string>
+						</dict>
+						<key>TargetingType</key>
+						<string>Specific</string>
+					</dict>
+				</array>
+				<key>CreationDate</key>
+				<real>616748819.81736898</real>
+				<key>ModificationDate</key>
+				<real>616748864.48422503</real>
+				<key>Name</key>
+				<string>Insert action by name</string>
+				<key>Triggers</key>
+				<array>
+					<dict>
+						<key>FireType</key>
+						<string>Pressed</string>
+						<key>KeyCode</key>
+						<integer>3</integer>
+						<key>MacroTriggerType</key>
+						<string>HotKey</string>
+						<key>Modifiers</key>
+						<integer>768</integer>
+					</dict>
+				</array>
+				<key>UID</key>
+				<string>7F804C1A-3965-43DA-8FFD-1DBA397CAAC8</string>
+			</dict>
+		</array>
+		<key>Name</key>
+		<string>􂫃 [BONUS: Other Macros]</string>
+		<key>ToggleMacroUID</key>
+		<string>8AD38FA9-E100-4C06-9A0D-B7E96C1D1398</string>
+		<key>UID</key>
+		<string>F9EC1A65-7A2A-4697-B490-3F035E33F159</string>
+	</dict>
+</array>
+</plist>

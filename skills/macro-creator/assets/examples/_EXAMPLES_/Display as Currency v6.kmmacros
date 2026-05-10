@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>Activate</key>
+		<string>Normal</string>
+		<key>CreationDate</key>
+		<real>453018705.83122802</real>
+		<key>IsActive</key>
+		<false/>
+		<key>Macros</key>
+		<array>
+			<dict>
+				<key>Actions</key>
+				<array>
+					<dict>
+						<key>ActionUID</key>
+						<integer>999636509</integer>
+						<key>Format</key>
+						<string>0.00</string>
+						<key>MacroActionType</key>
+						<string>SetVariableToCalculation</string>
+						<key>Text</key>
+						<string>100.7123</string>
+						<key>UseFormat</key>
+						<true/>
+						<key>Variable</key>
+						<string>V</string>
+					</dict>
+					<dict>
+						<key>Action</key>
+						<string>DisplayBriefly</string>
+						<key>ActionUID</key>
+						<integer>999636510</integer>
+						<key>MacroActionType</key>
+						<string>InsertText</string>
+						<key>Text</key>
+						<string>%V%.</string>
+					</dict>
+				</array>
+				<key>CreationDate</key>
+				<real>452751498.99209899</real>
+				<key>ModificationDate</key>
+				<real>390195441.01628798</real>
+				<key>Name</key>
+				<string>Display as Currency v6</string>
+				<key>Triggers</key>
+				<array/>
+				<key>UID</key>
+				<string>A669B70E-AD49-4601-899B-532D78A22DFC</string>
+			</dict>
+		</array>
+		<key>Name</key>
+		<string>Examples</string>
+		<key>ToggleMacroUID</key>
+		<string>09E10DB2-A690-4960-800E-8756FF36E4C7</string>
+		<key>UID</key>
+		<string>1447A520-04F3-4ABC-B509-2C39D3AAB7E0</string>
+	</dict>
+</array>
+</plist>

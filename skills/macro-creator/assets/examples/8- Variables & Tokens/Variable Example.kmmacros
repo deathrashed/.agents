@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>Activate</key>
+		<string>Normal</string>
+		<key>CreationDate</key>
+		<real>758821036.05380797</real>
+		<key>CustomIconData</key>
+		<string>KMEP-Minus</string>
+		<key>IsActive</key>
+		<false/>
+		<key>Macros</key>
+		<array>
+			<dict>
+				<key>Actions</key>
+				<array>
+					<dict>
+						<key>ActionUID</key>
+						<integer>999330507</integer>
+						<key>MacroActionType</key>
+						<string>SetVariableToText</string>
+						<key>Text</key>
+						<string>Hello</string>
+						<key>Variable</key>
+						<string>Instance Example</string>
+					</dict>
+					<dict>
+						<key>ActionUID</key>
+						<integer>999330508</integer>
+						<key>Asynchronously</key>
+						<false/>
+						<key>MacroActionType</key>
+						<string>ExecuteMacro</string>
+						<key>MacroUID</key>
+						<string>1A740C2A-AA13-4D4E-86AC-A7119BFC7434</string>
+						<key>TimeOutAbortsMacro</key>
+						<true/>
+						<key>UseParameter</key>
+						<false/>
+					</dict>
+				</array>
+				<key>CreationDate</key>
+				<real>759015280.54991603</real>
+				<key>IsActive</key>
+				<false/>
+				<key>ModificationDate</key>
+				<real>759346869.56622601</real>
+				<key>Name</key>
+				<string>Variable Example</string>
+				<key>Triggers</key>
+				<array>
+					<dict>
+						<key>FireType</key>
+						<string>Pressed</string>
+						<key>KeyCode</key>
+						<integer>35</integer>
+						<key>MacroTriggerType</key>
+						<string>HotKey</string>
+						<key>Modifiers</key>
+						<integer>6400</integer>
+					</dict>
+				</array>
+				<key>UID</key>
+				<string>EA22335E-33D9-473F-97AB-C7B6809F5E97</string>
+			</dict>
+		</array>
+		<key>Name</key>
+		<string>􂫃 [SECTION 8: Variables &amp; Tokens - Examples]</string>
+		<key>ToggleMacroUID</key>
+		<string>BA501F68-A56B-48E1-8E9E-9FA5BFFF6F44</string>
+		<key>UID</key>
+		<string>1AFEAC7B-05C6-45EF-8EFB-05E3A870961A</string>
+	</dict>
+</array>
+</plist>

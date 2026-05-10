@@ -1,0 +1,14 @@
+{
+  "name": "docker-compose-generator",
+  "version": "1.0.0",
+  "description": "ClaudeForge Docker Compose generator with service templates for PostgreSQL, Redis, MongoDB, MySQL, environment variables, networking, and volumes",
+  "author": {
+    "name": "ClaudeForge Community",
+    "url": "https://github.com/claudeforge/marketplace"
+  },
+  "keywords": [
+    "claudeforge",
+    "command"
+  ],
+  "homepage": "https://github.com/claudeforge/marketplace/tree/main/plugins/commands/docker-compose-generator"
+}

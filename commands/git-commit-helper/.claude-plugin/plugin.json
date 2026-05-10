@@ -1,0 +1,14 @@
+{
+  "name": "git-commit-helper",
+  "version": "1.0.0",
+  "description": "ClaudeForge git commit message generator with conventional commits, semantic versioning, and commit templates",
+  "author": {
+    "name": "ClaudeForge Community",
+    "url": "https://github.com/claudeforge/marketplace"
+  },
+  "keywords": [
+    "claudeforge",
+    "command"
+  ],
+  "homepage": "https://github.com/claudeforge/marketplace/tree/main/plugins/commands/git-commit-helper"
+}

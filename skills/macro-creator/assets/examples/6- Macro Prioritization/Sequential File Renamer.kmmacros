@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>Activate</key>
+		<string>Normal</string>
+		<key>CreationDate</key>
+		<real>770386838.18420005</real>
+		<key>CustomIconData</key>
+		<string>KMEP-Minus</string>
+		<key>Macros</key>
+		<array>
+			<dict>
+				<key>Actions</key>
+				<array>
+					<dict>
+						<key>ActionColor</key>
+						<string>Yellow</string>
+						<key>ActionUID</key>
+						<integer>16845482</integer>
+						<key>MacroActionType</key>
+						<string>SetVariableToCalculation</string>
+						<key>Text</key>
+						<string>1</string>
+						<key>UseFormat</key>
+						<false/>
+						<key>Variable</key>
+						<string>Local Counter</string>
+					</dict>
+					<dict>
+						<key>ActionColor</key>
+						<string>Orange</string>
+						<key>ActionUID</key>
+						<integer>16845488</integer>
+						<key>Actions</key>
+						<array>
+							<dict>
+								<key>ActionColor</key>
+								<string>Yellow</string>
+								<key>ActionUID</key>
+								<integer>16845492</integer>
+								<key>Destination</key>
+								<string>~/Desktop/File %Variable%Local Counter%.heic</string>
+								<key>MacroActionType</key>
+								<string>File</string>
+								<key>Operation</key>
+								<string>Move</string>
+								<key>Source</key>
+								<string>%Variable%Local File%</string>
+							</dict>
+							<dict>
+								<key>ActionColor</key>
+								<string>Yellow</string>
+								<key>ActionUID</key>
+								<integer>16845484</integer>
+								<key>MacroActionType</key>
+								<string>SetVariableToCalculation</string>
+								<key>Text</key>
+								<string>Local Counter + 1</string>
+								<key>UseFormat</key>
+								<false/>
+								<key>Variable</key>
+								<string>Local Counter</string>
+							</dict>
+						</array>
+						<key>Collections</key>
+						<dict>
+							<key>CollectionList</key>
+							<array>
+								<dict>
+									<key>CollectionType</key>
+									<string>FinderSelection</string>
+								</dict>
+							</array>
+						</dict>
+						<key>MacroActionType</key>
+						<string>For</string>
+						<key>TimeOutAbortsMacro</key>
+						<true/>
+						<key>Variable</key>
+						<string>Local File</string>
+					</dict>
+				</array>
+				<key>CreationDate</key>
+				<real>770386950.85474706</real>
+				<key>CustomIconData</key>
+				<string>KMEP-GenericFolder</string>
+				<key>IsActive</key>
+				<false/>
+				<key>ModificationDate</key>
+				<real>770496637.75626802</real>
+				<key>Name</key>
+				<string>Sequential File Renamer</string>
+				<key>Triggers</key>
+				<array>
+					<dict>
+						<key>FireType</key>
+						<string>Pressed</string>
+						<key>KeyCode</key>
+						<integer>1</integer>
+						<key>MacroTriggerType</key>
+						<string>HotKey</string>
+						<key>Modifiers</key>
+						<integer>6400</integer>
+					</dict>
+				</array>
+				<key>UID</key>
+				<string>DC0C95ED-E78F-489E-917B-6FDE755F9020</string>
+			</dict>
+		</array>
+		<key>Name</key>
+		<string>􂫃 [SECTION 6: Macro Prioritization]</string>
+		<key>ToggleMacroUID</key>
+		<string>7E4792B8-480F-4666-AA4E-F3B92CD1B9E9</string>
+		<key>UID</key>
+		<string>27BBDFFA-BBA3-4A8C-817D-F0A083E831A3</string>
+	</dict>
+</array>
+</plist>

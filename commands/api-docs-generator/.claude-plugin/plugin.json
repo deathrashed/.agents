@@ -1,0 +1,14 @@
+{
+  "name": "api-docs-generator",
+  "description": "Generate API documentation for endpoints",
+  "version": "1.0.0",
+  "author": {
+    "name": "ClaudeForge Community",
+    "url": "https://github.com/claudeforge/marketplace"
+  },
+  "homepage": "https://github.com/claudeforge/marketplace/tree/main/plugins/api-docs-generator",
+  "keywords": [
+    "claudeforge",
+    "documentation"
+  ]
+}

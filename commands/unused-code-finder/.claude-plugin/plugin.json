@@ -1,0 +1,14 @@
+{
+  "name": "unused-code-finder",
+  "version": "1.0.0",
+  "description": "ClaudeForge unused code detector with dead code elimination, unused variables detection, unreachable code analysis, and coverage integration",
+  "author": {
+    "name": "ClaudeForge Community",
+    "url": "https://github.com/claudeforge/marketplace"
+  },
+  "keywords": [
+    "claudeforge",
+    "command"
+  ],
+  "homepage": "https://github.com/claudeforge/marketplace/tree/main/plugins/commands/unused-code-finder"
+}

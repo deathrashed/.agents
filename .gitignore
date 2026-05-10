@@ -1,0 +1,68 @@
+# ═══════════════════════════════════════════════════════════
+# ZSH Configuration Git Ignore
+# ═══════════════════════════════════════════════════════════
+
+# Secrets & sensitive data
+.zsh.secrets
+/secrets
+
+# Logs
+/logs
+
+
+# ZSH compiled files & cache
+.zwc
+.zcompdump*
+*.zwc
+
+# ZSH session & history files
+.zsh_history
+.zsh_sessions*
+/.zsh_sessions
+/.archive/
+
+# macOS system files
+.DS_Store
+
+# Cursor IDE files
+/.cursor
+.cursorignore
+.cursorindexingignore
+
+# Other IDE/tool directories
+/.crush
+/.specstory
+
+# Oh-My-Zsh custom directory
+/.oh-my-zsh/custom
+
+# macOS custom folder icon file (`Icon` + carriage return)
+/Icon?
+
+# General
+__MACOSX/
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+
+/.roo
+.roomodes

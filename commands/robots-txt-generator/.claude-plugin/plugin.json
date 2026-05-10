@@ -1,0 +1,14 @@
+{
+  "name": "robots-txt-generator",
+  "version": "1.0.0",
+  "description": "ClaudeForge robots.txt generator with crawl rules, sitemap references, and search engine optimization",
+  "author": {
+    "name": "ClaudeForge Community",
+    "url": "https://github.com/claudeforge/marketplace"
+  },
+  "keywords": [
+    "claudeforge",
+    "command"
+  ],
+  "homepage": "https://github.com/claudeforge/marketplace/tree/main/plugins/commands/robots-txt-generator"
+}
