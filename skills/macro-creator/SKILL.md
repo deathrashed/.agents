@@ -1,5 +1,5 @@
 ---
-name: km-macro-creator
+name: macro-creator
 description: Create, debug, and safely extend Keyboard Maestro `.kmmacros` files using real exported action dictionaries instead of guessed XML. Use when users ask to build KM macros, fix import failures, add actions, or verify macro schema/structure. Keywords: kmmacros, Keyboard Maestro, MacroActionType, KM import error, plutil, macro XML.
 ---
 
