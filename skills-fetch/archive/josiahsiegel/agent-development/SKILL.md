@@ -1,0 +1,359 @@
+---
+name: agent-development
+description: Canonical guide to authoring Claude Code agent frontmatter and system prompts. PROACTIVELY activate for: (1) creating a new agent, (2) adding an agent to a plugin, (3) writing agent frontmatter, (4) designing an agent system prompt, (5) configuring agent triggering (<example> blocks, PROACTIVELY activate for patterns), (6) restricting agent tools (principle of least privilege), (7) choosing agent model (inherit vs sonnet/opus/haiku), (8) migrating deprecated agent: true flag to name: field, (9) diagnosing "agent never triggers" problems, (10) moving Windows/docs boilerplate out of YAML descriptions, (11) validating every skill has agent trigger coverage. Provides: canonical agent frontmatter template, required/recommended/deprecated fields, <example> block structure, lean-orchestrator body pattern, trigger-phrase disambiguation, and a validation checklist that catches the most common triggering mistakes before ship.
+---
+
+# Agent Development for Claude Code Plugins
+
+## Overview
+
+Agents are autonomous subprocesses that handle complex, multi-step tasks independently. Each agent is a markdown file in the `agents/` directory with YAML frontmatter defining its configuration and a markdown body serving as its system prompt.
+
+## Canonical agent frontmatter template (MANDATORY shape)
+
+This is the template every new agent MUST follow. Deviating from this shape is the #1 cause of agents that never trigger.
+
+```yaml
+---
+name: my-agent                                    # REQUIRED: kebab-case, 3-50 chars, alphanumeric start/end
+model: inherit                                    # REQUIRED: always `inherit` unless you have a hard reason
+color: blue                                       # RECOMMENDED: one of blue/cyan/green/yellow/magenta/red
+tools: Read, Write, Edit, Glob, Grep, Bash        # RECOMMENDED: minimal set; omit for full access
+description: |
+  One-sentence summary of what the agent does. PROACTIVELY activate for: (1) concrete trigger, (2) concrete trigger, ..., (N) concrete trigger. Provides: comma-separated capability nouns.
+
+  <example>
+  Context: Realistic situation where the agent should fire
+  user: "A realistic user quote — the kind of thing someone would actually type"
+  assistant: "Short 1-2 sentence response. Mention loading a specific skill if relevant."
+  <commentary>Triggers for specific-keyword-1, specific-keyword-2, specific-keyword-3</commentary>
+  </example>
+
+  <example>
+  Context: Another realistic situation covering a different capability
+  user: "..."
+  assistant: "..."
+  <commentary>Triggers for ...</commentary>
+  </example>
+
+  <example>
+  Context: A debugging / troubleshooting scenario
+  user: "..."
+  assistant: "..."
+  <commentary>Triggers for ...</commentary>
+  </example>
+
+  <example>
+  Context: A "when to pick this vs. that" scenario
+  user: "..."
+  assistant: "..."
+  <commentary>Triggers for ...</commentary>
+  </example>
+---
+
+You are [role] specializing in [domain]. [Lean orchestrator body — see "Lean Orchestrator Pattern" below.]
+```
+
+### Hard rules for the frontmatter
+
+1. **`name:` is required.** Do NOT use the deprecated `agent: true` flag — that pattern is legacy and results in an unnamed agent that cannot be referenced or routed to reliably. If you find `agent: true` in an existing file, replace it with `name: <kebab-name-from-filename>`.
+2. **`model: inherit` is required.** Never hard-code a model unless the agent has a documented capability requirement.
+3. **`description:` MUST include the enumerated `PROACTIVELY activate for: (1)... (2)... (N)...` pattern AND a `Provides: ...` capability list.** A description that only says "Use this agent for help with X" will not route reliably.
+4. **`description:` MUST include at least 4 `<example>` blocks** (5-7 preferred for agents that back multiple skills). Every skill the agent delegates to MUST have at least one example that would route to it.
+5. **Use `description: |` (YAML block scalar)** whenever the description spans multiple lines or contains `<example>` blocks. A folded scalar (`>`) or implicit flow scalar will mangle the examples.
+6. **Do NOT put cross-cutting boilerplate (Windows path rules, documentation policy, etc.) inside the YAML `description:` block.** That text is used for routing-match, and boilerplate that appears in many agents poisons the signal. Put it in the markdown body under a clearly named `## Windows file path requirements` section (or similar) instead.
+
+### Deprecated / broken patterns to migrate
+
+| Broken pattern | What it does | Fix |
+|---|---|---|
+| `agent: true` (no `name:`) | Agent cannot be named/routed reliably | Replace with `name: <kebab-name>` |
+| `description:` without `<example>` blocks | Agent rarely triggers | Add 4-6 `<example>` blocks covering each skill |
+| `description:` with "Use this agent for X" prose only | Vague routing, poor trigger | Rewrite with `PROACTIVELY activate for: (1)...` enumeration |
+| Windows boilerplate inside YAML `description:` | Pollutes routing signal | Move to `## Windows file path requirements` in body |
+| `model:` missing or hard-coded (e.g. `model: sonnet`) | Fails to inherit session model | Set `model: inherit` |
+| Single `<example>` block with full code in `assistant:` | Dilutes matching, bloats description | Keep assistant replies to 1-2 sentences; put code in skills |
+
+## Frontmatter Fields Reference
+
+### name (required)
+
+Agent identifier for namespacing and invocation.
+
+| Rule | Detail |
+|------|--------|
+| Length | 3-50 characters |
+| Format | Lowercase letters, numbers, hyphens only |
+| Start/end | Must be alphanumeric (not hyphen) |
+| Convention | Role-based: `code-reviewer`, `test-generator`, `domain-expert` |
+
+**Invalid names:** `ag` (too short), `-agent-` (starts/ends with hyphen), `my_agent` (underscores)
+
+### description (required - most critical field)
+
+Defines WHEN Claude should trigger this agent. Poor descriptions = agent never triggers.
+
+**Must include:**
+1. Triggering conditions ("Use this agent when...")
+2. 2-4 `<example>` blocks showing usage scenarios
+3. Each example: context, user request, assistant response, commentary
+4. Both proactive and reactive triggering scenarios
+
+**Good description pattern:**
+```yaml
+description: |
+  Use this agent when the user needs help with [domain]. Trigger for:
+  - [Scenario 1]
+  - [Scenario 2]
+  - [Scenario 3]
+
+  <example>
+  Context: [Specific situation]
+  user: "[What user says]"
+  assistant: "[How Claude responds and invokes agent]"
+  <commentary>
+  [Why this is the right agent for this request]
+  </commentary>
+  </example>
+```
+
+**Common mistake:** Vague descriptions without examples. "Helps with code review" will rarely trigger. Include concrete examples with exact user phrases.
+
+**Example block rules:**
+- Keep example blocks **concise** — assistant response should be 1-2 sentences, not full code
+- Limit to **3-7 example blocks** total (more dilutes matching quality)
+- Do NOT include full JSON schemas, code samples, or CLI output in examples
+- Examples show *when* to trigger and *how to respond*, not the domain content itself
+
+**Skill coverage requirement (CRITICAL):**
+When the agent delegates to skills, every skill MUST have at least one `<example>` block that would route to it. Count skills, count examples, and verify full coverage. If the plugin has 9 skills and only 7 trigger examples, 2 skills will have reduced activation reliability. Add examples until every skill has explicit coverage. When there are more skills than the 7-example limit allows, combine related skills into shared examples that mention both domains.
+
+### model (required)
+
+| Value | When to use |
+|-------|-------------|
+| `inherit` | **Default choice** - uses parent session's model |
+| `sonnet` | Balanced capability/speed |
+| `opus` | Most capable, for complex reasoning |
+| `haiku` | Fast/cheap, for simple validation |
+
+**Always use `inherit` unless the agent specifically needs a different capability level.**
+
+### color (required)
+
+Visual identifier in UI. Choose based on agent function:
+
+| Color | Use for |
+|-------|---------|
+| `blue` / `cyan` | Analysis, review, research |
+| `green` | Success-oriented, generation, creation |
+| `yellow` | Caution, validation, checking |
+| `red` | Critical, security, destructive operations |
+| `magenta` | Creative, design, architecture |
+
+Use distinct colors for different agents within the same plugin.
+
+### tools (optional)
+
+Restrict agent to specific tools. **Principle of least privilege** - only grant what's needed.
+
+```yaml
+# Read-only analysis
+tools: ["Read", "Grep", "Glob"]
+
+# Code generation
+tools: ["Read", "Write", "Edit", "Grep", "Glob"]
+
+# Full access (omit field entirely)
+# tools: (not specified)
+```
+
+Common tool names: `Read`, `Write`, `Edit`, `Grep`, `Glob`, `Bash`, `WebSearch`, `WebFetch`, `Skill`, `Agent`
+
+MCP tools use format: `mcp__server-name__tool-name`
+
+## System Prompt Design
+
+The markdown body becomes the agent's system prompt. Write in **second person** ("You are...", "You will...").
+
+### Structure Template
+
+```markdown
+You are [role] specializing in [domain].
+
+## Core Responsibilities
+1. [Primary responsibility]
+2. [Secondary responsibility]
+
+## Process
+1. [Step one]
+2. [Step two]
+3. [Step three]
+
+## Quality Standards
+- [Standard 1]
+- [Standard 2]
+
+## Output Format
+- [What to include]
+- [How to structure results]
+
+## Edge Cases
+- [Situation]: [How to handle]
+```
+
+### Best Practices
+
+**DO:**
+- Write in second person ("You are...", "You will...")
+- Be specific about responsibilities and process steps
+- Define output format clearly
+- Address edge cases
+- Include skill activation instructions if the agent should load skills
+- Keep the agent body as a **lean orchestrator** (see below)
+
+**DON'T:**
+- Write in first person ("I am...", "I will...")
+- Be vague or generic ("help with stuff")
+- Skip process steps
+- Leave output format undefined
+- Omit quality standards
+- Embed domain knowledge that belongs in skills (see below)
+
+## Lean Orchestrator Pattern (CRITICAL)
+
+An agent body must be a **lean orchestrator**, NOT a domain knowledge dump. The agent delegates to skills for detailed knowledge.
+
+### Agent Body Size Limits
+
+| Metric | Target | Hard Maximum |
+|--------|--------|-------------|
+| Word count | 1,500-2,500 words | 3,000 words |
+| Character count | ~10,000-15,000 chars | 20,000 chars |
+
+### What Belongs in the Agent Body
+
+| Section | Required | Purpose |
+|---------|----------|---------|
+| Role identity | Yes | "You are [role] specializing in [domain]" |
+| Skill activation rules | Yes | Topic-to-skill mapping table |
+| High-level process | Yes | Design/workflow steps |
+| Output format | Yes | What to include in responses |
+| Brief service summaries | Optional | 2-3 sentences per area to help decide which skill to load |
+| Edge cases / troubleshooting tips | Optional | Quick reference only |
+
+### What Does NOT Belong in the Agent Body
+
+- **Detailed domain knowledge** — belongs in skills
+- **Complete CLI/API references** — belongs in skill references/
+- **Full code examples** — belongs in skill examples/
+- **Duplicated skill content** — if it's in a skill, do NOT repeat it in the agent
+
+### Anti-Pattern: Content Duplication
+
+**NEVER duplicate content between the agent body and skills.** This is the most common mistake and causes massive context bloat.
+
+**Bad:** Agent body contains a full "Plugin.json Schema" section AND the plugin-master skill also contains it.
+**Good:** Agent body says "For plugin.json schema details, load `plugin-master:plugin-master`" and keeps only a 1-sentence summary.
+
+### Lean Orchestrator Template
+
+```markdown
+You are [role] specializing in [domain].
+
+## Skill Activation - CRITICAL
+[Topic-to-skill mapping table — this is the heart of the agent]
+
+## Core Responsibilities
+[2-5 bullet points on what this agent does]
+
+## Process
+[5-7 step workflow for handling user requests]
+
+## Quality Standards
+[Brief checklist — 5-10 items]
+
+## Output Format
+[What to include in responses]
+```
+
+### Description Size Limits
+
+Agent descriptions should be concise and effective:
+
+| Element | Guideline |
+|---------|-----------|
+| Intro text | 1-2 sentences on when to trigger |
+| Example blocks | 3-7 blocks covering diverse scenarios |
+| Total description | Should fit naturally — focus on quality trigger examples over length |
+
+## Agent Design Principles (2025)
+
+### Agent-First Plugin Design
+
+- Primary plugin interface is ONE expert agent named `{domain}-expert`
+- Plugin named `docker-master` → agent named `docker-expert`
+- Only 0-2 slash commands for automation workflows
+- Users interact conversationally, not through command menus
+
+### Single Responsibility
+
+Each agent should have a clear, focused purpose. Don't create "do everything" agents. If a plugin needs multiple capabilities, use one expert agent that loads different skills based on context.
+
+### Skill Integration
+
+Expert agents should load relevant skills before answering. Include skill activation instructions in the system prompt:
+
+```markdown
+## Skill Activation
+When the user asks about [topic], load `plugin-name:skill-name` before responding.
+```
+
+### Preventing Trigger Phrase Overlap Between Skills
+
+When a plugin has multiple skills, their trigger phrases and description terms must not create ambiguity. If two skills both claim the same keyword (e.g., both "programmatic-development" and "tmdl-mastery" claim "TMDL"), the agent cannot reliably route requests.
+
+**Disambiguation rules:**
+1. **Audit trigger terms across all skills** — list every trigger phrase from every skill description side by side. Flag any term that appears in more than one skill.
+2. **Assign exclusive ownership** — each ambiguous term must belong to exactly one skill. The other skill should use a more specific phrase (e.g., "TMDL file editing" vs. "programmatic deployment using TMDL").
+3. **Add disambiguation hints to the agent's skill activation table** — for terms that could route to multiple skills, add a clarifying note: "TMDL editing/syntax → tmdl-mastery; TMDL in deployment pipelines → programmatic-development".
+4. **Test with ambiguous queries** — after writing descriptions, mentally test phrases like "help me with TMDL" and verify the routing is unambiguous.
+
+## Validation Checklist
+
+Before finalizing an agent:
+
+- [ ] Name: 3-50 chars, lowercase, hyphens, starts/ends alphanumeric
+- [ ] Description: includes triggering conditions and 2-4 `<example>` blocks
+- [ ] **Every skill has trigger coverage**: count skills and verify each has at least one example that routes to it
+- [ ] **No trigger phrase overlap**: no ambiguous keyword claimed by multiple skills without disambiguation
+- [ ] Model: set to `inherit` (unless specific need)
+- [ ] Color: appropriate for agent function
+- [ ] Tools: restricted to minimum needed (or omitted for full access)
+- [ ] System prompt: second person, clear responsibilities, defined process and output
+- [ ] Frontmatter: valid YAML with all required fields
+- [ ] File location: `agents/agent-name.md`
+
+## Testing
+
+1. Write agent with specific triggering examples
+2. Use similar phrasing to examples in your test queries
+3. Verify Claude loads the agent for matching requests
+4. Test that the agent follows its defined process
+5. Check output matches defined format
+6. Test edge cases mentioned in system prompt
+
+## Common Mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Vague description without examples | Add 2-4 `<example>` blocks with concrete user phrases |
+| Skills without trigger examples | Every skill must have at least one example that routes to it — count and verify |
+| Trigger phrase overlap between skills | Audit all skill descriptions for shared keywords; assign exclusive ownership or add disambiguation |
+| `model: sonnet` when `inherit` works | Use `inherit` unless agent needs specific capability |
+| Too many tools granted | Restrict to minimum needed tools |
+| Generic system prompt | Be specific about process, output format, quality standards |
+| No skill activation | Add skill loading instructions for knowledge-dependent agents |
+| Multiple agents in one plugin | Use one expert agent with skills for different topics |
+| Example blocks with full code/JSON | Keep examples concise (1-2 sentence responses); code belongs in skills |
+| Same cross-cutting block in every skill | Put platform guidelines in agent body or one shared reference, not each SKILL.md |

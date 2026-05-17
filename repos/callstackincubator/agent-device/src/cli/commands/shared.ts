@@ -1,0 +1,29 @@
+import type { CliFlags } from '../../utils/command-schema.ts';
+import { printJson } from '../../utils/output.ts';
+import { readCommandMessage } from '../../utils/success-text.ts';
+import { selectionOptionsFromFlags, type SelectionOptions } from '../../command-codecs/flags.ts';
+
+export function buildSelectionOptions(flags: CliFlags): SelectionOptions {
+  return selectionOptionsFromFlags(flags);
+}
+
+export function writeCommandOutput(
+  flags: CliFlags,
+  data: unknown,
+  renderHuman?: () => string | null | undefined,
+): void {
+  if (flags.json) {
+    printJson({ success: true, data });
+    return;
+  }
+  const text = renderHuman?.();
+  if (text) writeLine(text);
+}
+
+export function writeCommandMessage(flags: CliFlags, data: Record<string, unknown>): void {
+  writeCommandOutput(flags, data, () => readCommandMessage(data));
+}
+
+function writeLine(text: string): void {
+  process.stdout.write(text.endsWith('\n') ? text : `${text}\n`);
+}

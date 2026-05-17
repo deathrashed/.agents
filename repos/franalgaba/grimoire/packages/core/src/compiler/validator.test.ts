@@ -1,0 +1,470 @@
+/**
+ * Validator tests
+ */
+
+import { describe, expect, test } from "bun:test";
+import type { SpellIR } from "../types/ir.js";
+import { validateIR } from "./validator.js";
+
+function createValidIR(): SpellIR {
+  return {
+    id: "spell",
+    version: "1.0.0",
+    meta: {
+      name: "spell",
+      created: Date.now(),
+      hash: "hash",
+    },
+    aliases: [{ alias: "aave", chain: 1, address: "0x0000000000000000000000000000000000000001" }],
+    assets: [
+      {
+        symbol: "USDC",
+        chain: 1,
+        address: "0x0000000000000000000000000000000000000002",
+        decimals: 6,
+      },
+    ],
+    skills: [],
+    advisors: [{ name: "advisor", model: "haiku", scope: "read-only" }],
+    params: [{ name: "amount", type: "number", default: 1 }],
+    state: {
+      persistent: { counter: { key: "counter", initialValue: 0 } },
+      ephemeral: {},
+    },
+    steps: [
+      {
+        kind: "compute",
+        id: "compute_1",
+        assignments: [{ variable: "x", expression: { kind: "param", name: "amount" } }],
+        dependsOn: [],
+      },
+      {
+        kind: "action",
+        id: "action_1",
+        action: {
+          type: "transfer",
+          asset: "USDC",
+          amount: { kind: "literal", value: 1, type: "int" },
+          to: "0x0000000000000000000000000000000000000003",
+        },
+        constraints: {},
+        onFailure: "revert",
+        dependsOn: [],
+      },
+      {
+        kind: "loop",
+        id: "loop_1",
+        loopType: { type: "repeat", count: 1 },
+        bodySteps: ["compute_1"],
+        maxIterations: 1,
+        dependsOn: [],
+      },
+      {
+        kind: "advisory",
+        id: "advisory_1",
+        advisor: "advisor",
+        prompt: "ok?",
+        outputSchema: { type: "boolean" },
+        outputBinding: "decision",
+        timeout: 5,
+        fallback: { kind: "literal", value: true, type: "bool" },
+        dependsOn: [],
+      },
+    ],
+    guards: [
+      {
+        id: "guard_1",
+        check: { kind: "param", name: "amount" },
+        severity: "warn",
+        message: "ok",
+      },
+    ],
+    triggers: [{ type: "manual" }],
+  };
+}
+
+describe("Validator", () => {
+  test("validates a correct IR", () => {
+    const result = validateIR(createValidIR());
+    expect(result.valid).toBe(true);
+  });
+
+  test("reports unknown references", () => {
+    const ir = createValidIR();
+    ir.steps[1] = {
+      kind: "action",
+      id: "action_2",
+      action: {
+        type: "transfer",
+        asset: "UNKNOWN",
+        amount: { kind: "literal", value: 1, type: "int" },
+        to: "0x0000000000000000000000000000000000000003",
+      },
+      constraints: {},
+      onFailure: "revert",
+      dependsOn: ["missing"],
+    };
+
+    const result = validateIR(ir);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.code === "UNKNOWN_STEP_REFERENCE")).toBe(true);
+    expect(result.warnings.some((w) => w.code === "UNKNOWN_ASSET")).toBe(true);
+  });
+
+  test("allows auto-selected venues for skills", () => {
+    const ir = createValidIR();
+    ir.aliases.push({
+      alias: "uniswap",
+      chain: 1,
+      address: "0x0000000000000000000000000000000000000004",
+    });
+    ir.skills = [{ name: "dex", type: "swap", adapters: ["uniswap"] }];
+    ir.steps = [
+      {
+        kind: "action",
+        id: "action_auto",
+        skill: "dex",
+        action: {
+          type: "swap",
+          venue: "dex",
+          assetIn: "USDC",
+          assetOut: "USDC",
+          amount: { kind: "literal", value: 1, type: "int" },
+          mode: "exact_in",
+        },
+        constraints: {},
+        onFailure: "revert",
+        dependsOn: [],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.code === "AUTO_VENUE")).toBe(true);
+  });
+
+  test("detects dependency cycles", () => {
+    const ir = createValidIR();
+    ir.steps = [
+      {
+        kind: "compute",
+        id: "step_a",
+        assignments: [],
+        dependsOn: ["step_b"],
+      },
+      {
+        kind: "compute",
+        id: "step_b",
+        assignments: [],
+        dependsOn: ["step_a"],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.code === "DEPENDENCY_CYCLE")).toBe(true);
+  });
+
+  test("detects advisory issues", () => {
+    const ir = createValidIR();
+    ir.steps = [
+      {
+        kind: "advisory",
+        id: "advisory_bad",
+        advisor: "missing",
+        prompt: "?",
+        outputSchema: { type: "boolean" },
+        outputBinding: "decision",
+        timeout: 0,
+        fallback: { kind: "literal", value: false, type: "bool" },
+        dependsOn: [],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.code === "ADVISORY_NO_TIMEOUT")).toBe(true);
+    expect(result.errors.some((e) => e.code === "UNKNOWN_ADVISOR")).toBe(true);
+  });
+
+  test("warns when no steps", () => {
+    const ir = createValidIR();
+    ir.steps = [];
+
+    const result = validateIR(ir);
+    expect(result.warnings.some((w) => w.code === "NO_STEPS")).toBe(true);
+  });
+
+  test("warns on removed venue aliases", () => {
+    const ir = createValidIR();
+    ir.aliases.push({
+      alias: "yellow",
+      chain: 1,
+      address: "0x0000000000000000000000000000000000000008",
+    });
+    ir.aliases.push({
+      alias: "lifi",
+      chain: 1,
+      address: "0x0000000000000000000000000000000000000009",
+    });
+
+    const result = validateIR(ir);
+    expect(
+      result.warnings.filter((warning) => warning.code === "REMOVED_VENUE_ALIAS")
+    ).toHaveLength(2);
+  });
+
+  test("warns on legacy hyperliquid swap actions", () => {
+    const ir = createValidIR();
+    ir.aliases.push({
+      alias: "hyperliquid",
+      chain: 0,
+      address: "0x0000000000000000000000000000000000000007",
+    });
+    ir.steps = [
+      {
+        kind: "action",
+        id: "hyperliquid_swap",
+        action: {
+          type: "swap",
+          venue: "hyperliquid",
+          assetIn: "USDC",
+          assetOut: "USDC",
+          amount: { kind: "literal", value: 1, type: "int" },
+          mode: "exact_in",
+        },
+        constraints: {},
+        onFailure: "revert",
+        dependsOn: [],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.warnings.some((warning) => warning.code === "HYPERLIQUID_SWAP_DEPRECATED")).toBe(
+      true
+    );
+  });
+
+  test("reports QUOTED_ADDRESS_LITERAL for quoted token/address action fields", () => {
+    const ir = createValidIR();
+    ir.aliases.push({
+      alias: "pendle",
+      chain: 1,
+      address: "0x0000000000000000000000000000000000000010",
+    });
+    ir.steps = [
+      {
+        kind: "action",
+        id: "swap_with_quoted",
+        action: {
+          type: "swap",
+          venue: "aave",
+          assetIn: '"0x00000000000000000000000000000000000000aa"',
+          assetOut: "USDC",
+          amount: { kind: "literal", value: 1, type: "int" },
+          mode: "exact_in",
+        },
+        constraints: {},
+        onFailure: "revert",
+        dependsOn: [],
+      },
+      {
+        kind: "action",
+        id: "pendle_with_quoted_output",
+        action: {
+          type: "add_liquidity",
+          venue: "pendle",
+          asset: "USDC",
+          amount: { kind: "literal", value: 1, type: "int" },
+          outputs: ['"0x00000000000000000000000000000000000000bb"'],
+        },
+        constraints: {},
+        onFailure: "revert",
+        dependsOn: [],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.valid).toBe(false);
+    const quotedErrors = result.errors.filter((error) => error.code === "QUOTED_ADDRESS_LITERAL");
+    expect(quotedErrors).toHaveLength(2);
+    expect(quotedErrors.some((error) => error.message.includes("swap_with_quoted"))).toBe(true);
+    expect(quotedErrors.some((error) => error.message.includes("asset_in"))).toBe(true);
+    expect(quotedErrors.some((error) => error.message.includes("pendle_with_quoted_output"))).toBe(
+      true
+    );
+    expect(quotedErrors.some((error) => error.message.includes("outputs[0]"))).toBe(true);
+  });
+
+  test("does not report QUOTED_ADDRESS_LITERAL for bare address literals", () => {
+    const ir = createValidIR();
+    ir.steps = [
+      {
+        kind: "action",
+        id: "swap_with_bare",
+        action: {
+          type: "swap",
+          venue: "aave",
+          assetIn: "0x00000000000000000000000000000000000000aa",
+          assetOut: "USDC",
+          amount: { kind: "literal", value: 1, type: "int" },
+          mode: "exact_in",
+        },
+        constraints: {},
+        onFailure: "revert",
+        dependsOn: [],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.errors.some((error) => error.code === "QUOTED_ADDRESS_LITERAL")).toBe(false);
+  });
+
+  test("validates complex steps", () => {
+    const ir = createValidIR();
+    ir.steps = [
+      {
+        kind: "parallel",
+        id: "parallel",
+        branches: [
+          { id: "b1", name: "b1", steps: ["compute_1"] },
+          { id: "b2", name: "b2", steps: ["missing"] },
+        ],
+        join: { type: "all" },
+        onFail: "abort",
+        dependsOn: [],
+      },
+      {
+        kind: "pipeline",
+        id: "pipeline",
+        source: { kind: "param", name: "amount" },
+        stages: [
+          { op: "where", predicate: { kind: "literal", value: true, type: "bool" } },
+          { op: "sort", by: { kind: "literal", value: 1, type: "int" }, order: "asc" },
+          { op: "map", step: "missing" },
+        ],
+        dependsOn: [],
+      },
+      {
+        kind: "try",
+        id: "try",
+        trySteps: ["missing"],
+        catchBlocks: [],
+        dependsOn: [],
+      },
+      {
+        kind: "emit",
+        id: "emit",
+        event: "event",
+        data: { value: { kind: "param", name: "amount" } },
+        dependsOn: [],
+      },
+      {
+        kind: "wait",
+        id: "wait",
+        duration: 1,
+        dependsOn: [],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.code === "UNKNOWN_STEP_REFERENCE")).toBe(true);
+  });
+
+  test("emits advisory summaries for validation", () => {
+    const ir = createValidIR();
+    ir.steps = [
+      {
+        kind: "advisory",
+        id: "advisory_summary",
+        advisor: "advisor",
+        prompt: "Should we move funds?",
+        context: {
+          balance: { kind: "binding", name: "amount" },
+        },
+        policyScope: "constraints",
+        outputSchema: { type: "boolean" },
+        outputBinding: "decision",
+        violationPolicy: "reject",
+        violationPolicyExplicit: true,
+        clampConstraints: ["max_slippage"],
+        timeout: 10,
+        fallback: { kind: "literal", value: false, type: "bool" },
+        dependsOn: [],
+      },
+      {
+        kind: "conditional",
+        id: "cond_1",
+        condition: { kind: "binding", name: "decision" },
+        thenSteps: ["action_approved"],
+        elseSteps: ["emit_rejected"],
+        dependsOn: [],
+      },
+      {
+        kind: "action",
+        id: "action_approved",
+        action: {
+          type: "transfer",
+          asset: "USDC",
+          amount: { kind: "literal", value: 1, type: "int" },
+          to: "0x0000000000000000000000000000000000000004",
+        },
+        constraints: {
+          maxSlippageBps: 50,
+          maxGas: { kind: "literal", value: 100000, type: "int" },
+        },
+        onFailure: "revert",
+        dependsOn: [],
+      },
+      {
+        kind: "emit",
+        id: "emit_rejected",
+        event: "rejected",
+        data: {},
+        dependsOn: [],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.advisorySummaries.length).toBe(1);
+    const summary = result.advisorySummaries[0];
+    expect(summary?.advisory_id).toBe("advisory_summary");
+    expect(summary?.dependent_paths).toContain("conditional:cond_1:then");
+    expect(summary?.dependent_paths).toContain("conditional:cond_1:else");
+    expect(summary?.irreversible_actions_downstream).toBe(1);
+    expect(summary?.governing_constraints).toContain("constraints");
+    expect(summary?.governing_constraints).toContain("max_slippage");
+    expect(summary?.governing_constraints).toContain("max_gas");
+  });
+
+  test("rejects non-clampable advisory clamp constraints", () => {
+    const ir = createValidIR();
+    ir.steps = [
+      {
+        kind: "advisory",
+        id: "advisory_bad_clamp",
+        advisor: "advisor",
+        prompt: "Should we move funds?",
+        context: {
+          balance: { kind: "binding", name: "amount" },
+        },
+        policyScope: "constraints",
+        outputSchema: { type: "boolean" },
+        outputBinding: "decision",
+        violationPolicy: "clamp",
+        violationPolicyExplicit: true,
+        clampConstraints: ["max_single_move"],
+        timeout: 10,
+        fallback: { kind: "literal", value: true, type: "bool" },
+        dependsOn: [],
+      },
+    ];
+
+    const result = validateIR(ir);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((error) => error.code === "ADVISORY_NON_CLAMPABLE_CONSTRAINT")).toBe(
+      true
+    );
+  });
+});

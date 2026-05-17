@@ -1,0 +1,14 @@
+[
+  {
+    "id": "millionco/react-doctor/react-doctor",
+    "name": "react-doctor",
+    "description": "Use when finishing a feature, fixing a bug, before committing React code, or when the user wants to improve code quality or clean up a codebase. Checks for score regression. Covers lint, dead code, accessibility, bundle size, architecture diagnostics.",
+    "owner": "millionco",
+    "repo": "react-doctor",
+    "skillsPath": "skills",
+    "path": "react-doctor",
+    "content": "---\nname: react-doctor\ndescription: Use when finishing a feature, fixing a bug, before committing React code, or when the user wants to improve code quality or clean up a codebase. Checks for score regression. Covers lint, dead code, accessibility, bundle size, architecture diagnostics.\nversion: \"1.0.0\"\n---\n\n# React Doctor\n\nScans React codebases for security, performance, correctness, and architecture issues. Outputs a 0–100 health score.\n\n## After making React code changes:\n\nRun `npx -y react-doctor@latest . --verbose --diff` and check the score did not regress.\n\nIf the score dropped, fix the regressions before committing.\n\n## For general cleanup or code improvement:\n\nRun `npx -y react-doctor@latest . --verbose` (without `--diff`) to scan the full codebase. Fix issues by severity — errors first, then warnings.\n\n## Command\n\n```bash\nnpx -y react-doctor@latest . --verbose --diff\n```\n\n| Flag        | Purpose                                       |\n| ----------- | --------------------------------------------- |\n| `.`         | Scan current directory                        |\n| `--verbose` | Show affected files and line numbers per rule |\n| `--diff`    | Only scan changed files vs base branch        |\n| `--score`   | Output only the numeric score                 |\n",
+    "isInstalled": false,
+    "isFetched": true
+  }
+]

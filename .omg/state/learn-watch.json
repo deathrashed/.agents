@@ -1,0 +1,12 @@
+{
+  "last_session_id": "ccd2590d-2a5a-4bd5-b037-79849ce4036f",
+  "last_event_key": "ccd2590d-2a5a-4bd5-b037-79849ce4036f:transcript:58ed070ee6621f4b49540f339348179a9643114c5b31bc00c39d41f550d54f95",
+  "last_prompted_session_id": "",
+  "last_reason": "short-session",
+  "last_prompted_at": "",
+  "last_user_message_count": 0,
+  "last_actionable_message_count": 0,
+  "deep_interview_lock_active": false,
+  "deep_interview_lock_source": "/Users/rd/.agents/.omg/state/deep-interview.json",
+  "updated_at": "2026-05-15T00:59:58.239Z"
+}

@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "name": "java-development-assistant",
+  "version": "3.0.0",
+  "description": "Production-grade Java development plugin with 8 specialized agents, 12 SASMP-compliant skills, and 4 commands for core Java, Spring, testing, DevOps, and enterprise development",
+  "author": {
+    "name": "Dr. Umit Kacar & Muhsin Elcicek",
+    "email": "kacarumit.phd@gmail.com"
+  },
+  "repository": "https://github.com/pluginagentmarketplace/custom-plugin-java",
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": [
+    "java",
+    "spring-boot",
+    "maven",
+    "gradle",
+    "jvm",
+    "collections",
+    "concurrency",
+    "junit",
+    "testing",
+    "microservices",
+    "docker",
+    "performance"
+  ],
+  "agents": [
+    "./agents/01-java-fundamentals.md",
+    "./agents/02-java-advanced.md",
+    "./agents/03-java-spring.md",
+    "./agents/04-java-testing.md",
+    "./agents/05-java-build-tools.md",
+    "./agents/06-java-persistence.md",
+    "./agents/07-java-microservices.md",
+    "./agents/08-java-devops.md"
+  ],
+  "skills": [
+    "./skills/java-fundamentals/SKILL.md",
+    "./skills/java-spring-boot/SKILL.md",
+    "./skills/java-testing/SKILL.md",
+    "./skills/java-concurrency/SKILL.md",
+    "./skills/java-jpa-hibernate/SKILL.md",
+    "./skills/java-maven-gradle/SKILL.md",
+    "./skills/java-microservices/SKILL.md",
+    "./skills/java-maven/SKILL.md",
+    "./skills/java-gradle/SKILL.md",
+    "./skills/java-docker/SKILL.md",
+    "./skills/java-testing-advanced/SKILL.md",
+    "./skills/java-performance/SKILL.md"
+  ],
+  "commands": [
+    "./commands/java-check.md",
+    "./commands/java-new.md",
+    "./commands/java-build.md",
+    "./commands/java-debug.md"
+  ]
+}

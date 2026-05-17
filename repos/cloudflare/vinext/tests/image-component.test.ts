@@ -1,0 +1,906 @@
+/**
+ * next/image component unit tests.
+ *
+ * Mirrors test cases from Next.js test/unit/next-image-new.test.ts and
+ * test/unit/next-image-get-img-props.test.ts, adapted for vinext's
+ * Image shim implementation.
+ *
+ * Tests SSR output, srcSet generation, getImageProps(), fill mode,
+ * priority, custom loader, and static image data handling.
+ */
+import { describe, it, expect, vi, afterEach } from "vite-plus/test";
+import React from "react";
+import ReactDOMServer from "react-dom/server";
+import Image, { getImageProps, type StaticImageData } from "../packages/vinext/src/shims/image.js";
+
+/** Helper: expected optimization URL matching what the image shim produces. */
+function optUrl(src: string, w: number, q = 75): string {
+  return `/_vinext/image?url=${encodeURIComponent(src)}&w=${w}&q=${q}`;
+}
+/** Same as optUrl but with HTML entity encoding (for SSR output assertions). */
+function optUrlHtml(src: string, w: number, q = 75): string {
+  return optUrl(src, w, q).replace(/&/g, "&amp;");
+}
+
+// ─── SSR rendering ──────────────────────────────────────────────────────
+
+describe("Image SSR rendering", () => {
+  it("renders a basic <img> tag with correct attributes", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "a nice image",
+        src: "/test.png",
+        width: 100,
+        height: 100,
+      }),
+    );
+    expect(html).toContain('alt="a nice image"');
+    // Local images are routed through the optimization endpoint
+    expect(html).toContain(`src="${optUrlHtml("/test.png", 100)}"`);
+    expect(html).toContain('width="100"');
+    expect(html).toContain('height="100"');
+    expect(html).toContain('decoding="async"');
+    expect(html).toContain('loading="lazy"');
+    expect(html).toContain('data-nimg="1"');
+  });
+
+  it("renders with priority (eager loading + fetchpriority)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "priority image",
+        src: "/hero.png",
+        width: 800,
+        height: 600,
+        priority: true,
+      }),
+    );
+    expect(html).toContain('loading="eager"');
+    expect(html).toContain('fetchPriority="high"');
+    expect(html).not.toContain('loading="lazy"');
+  });
+
+  it("renders fill mode with absolute positioning", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "fill image",
+        src: "/bg.png",
+        fill: true,
+      }),
+    );
+    // Fill mode: no width/height attributes
+    expect(html).not.toMatch(/width="\d+"/);
+    expect(html).not.toMatch(/height="\d+"/);
+    // Fill adds position:absolute and 100% dimensions
+    expect(html).toContain("position:absolute");
+    expect(html).toContain("width:100%");
+    expect(html).toContain("height:100%");
+    expect(html).toContain('data-nimg="fill"');
+    // Fill defaults sizes to 100vw
+    expect(html).toContain('sizes="100vw"');
+  });
+
+  it("renders with custom sizes prop", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "sized",
+        src: "/img.png",
+        width: 500,
+        height: 300,
+        sizes: "(max-width: 768px) 100vw, 50vw",
+      }),
+    );
+    expect(html).toContain('sizes="(max-width: 768px) 100vw, 50vw"');
+  });
+
+  it("renders with blur placeholder styles", () => {
+    const blurDataURL = "data:image/png;base64,abc123";
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "blurry",
+        src: "/photo.jpg",
+        width: 400,
+        height: 300,
+        placeholder: "blur",
+        blurDataURL,
+      }),
+    );
+    expect(html).toContain(`url(${blurDataURL})`);
+    expect(html).toContain("background-size:cover");
+  });
+
+  it("renders with custom loader", () => {
+    const loader = ({ src, width, quality }: { src: string; width: number; quality?: number }) =>
+      `https://cdn.example.com${src}?w=${width}&q=${quality || 75}`;
+
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "cdn image",
+        src: "/photo.jpg",
+        width: 200,
+        height: 150,
+        loader,
+      }),
+    );
+    expect(html).toContain('src="https://cdn.example.com/photo.jpg?w=200&amp;q=75"');
+  });
+
+  it("renders StaticImageData (import result)", () => {
+    const staticImage: StaticImageData = {
+      src: "/_next/static/media/test.abc123.png",
+      width: 800,
+      height: 600,
+      blurDataURL: "data:image/png;base64,xyz",
+    };
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "static import",
+        src: staticImage,
+        placeholder: "blur",
+      }),
+    );
+    expect(html).toContain(`src="${optUrlHtml("/_next/static/media/test.abc123.png", 800)}"`);
+
+    expect(html).toContain('width="800"');
+    expect(html).toContain('height="600"');
+    expect(html).toContain("data:image/png;base64,xyz");
+  });
+
+  it("applies className and custom style", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "styled",
+        src: "/test.png",
+        width: 100,
+        height: 100,
+        className: "hero-img",
+        style: { borderRadius: "8px" },
+      }),
+    );
+    expect(html).toContain('class="hero-img"');
+    expect(html).toContain("border-radius:8px");
+  });
+});
+
+// ─── srcSet generation ──────────────────────────────────────────────────
+
+describe("Image srcSet generation", () => {
+  it("generates srcSet for local images with width", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "test",
+        src: "/photo.png",
+        width: 500,
+        height: 400,
+      }),
+    );
+    // RESPONSIVE_WIDTHS = [640, 750, 828, 1080, 1200, 1920, 2048, 3840]
+    // Filter: widths <= 500 * 2 = 1000 → [640, 750, 828]
+    expect(html).toContain("srcSet");
+    expect(html).toContain(`${optUrlHtml("/photo.png", 640)} 640w`);
+    expect(html).toContain(`${optUrlHtml("/photo.png", 750)} 750w`);
+    expect(html).toContain(`${optUrlHtml("/photo.png", 828)} 828w`);
+    // Should not include widths > 1000
+    expect(html).not.toContain("1080w");
+  });
+
+  it("generates srcSet with all widths for large images", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "test",
+        src: "/large.png",
+        width: 2000,
+        height: 1500,
+      }),
+    );
+    // widths <= 4000: all of them
+    expect(html).toContain(`${optUrlHtml("/large.png", 640)} 640w`);
+    expect(html).toContain(`${optUrlHtml("/large.png", 3840)} 3840w`);
+  });
+
+  it("generates fallback srcSet for very small images", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "tiny",
+        src: "/icon.png",
+        width: 16,
+        height: 16,
+      }),
+    );
+    // widths <= 32: none of RESPONSIVE_WIDTHS qualify
+    // Falls back to single: optimized icon.png at 16w
+    expect(html).toContain(`${optUrlHtml("/icon.png", 16)} 16w`);
+  });
+
+  it("does not generate srcSet for fill mode", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "fill",
+        src: "/bg.png",
+        fill: true,
+      }),
+    );
+    // Fill mode: no srcSet (srcSet is only for local non-fill images with width)
+    expect(html).not.toContain("srcSet");
+  });
+});
+
+// ─── getImageProps ──────────────────────────────────────────────────────
+
+describe("getImageProps", () => {
+  it("returns correct props for basic image", () => {
+    const { props } = getImageProps({
+      alt: "a nice desc",
+      src: "/test.png",
+      width: 100,
+      height: 200,
+    });
+
+    expect(props.alt).toBe("a nice desc");
+    expect(props.src).toBe(optUrl("/test.png", 100));
+    expect(props.width).toBe(100);
+    expect(props.height).toBe(200);
+    expect(props.loading).toBe("lazy");
+    expect(props.decoding).toBe("async");
+    expect((props as any)["data-nimg"]).toBe("1");
+  });
+
+  it("returns priority props", () => {
+    const { props } = getImageProps({
+      alt: "priority",
+      src: "/hero.png",
+      width: 800,
+      height: 600,
+      priority: true,
+    });
+
+    expect(props.loading).toBe("eager");
+    expect(props.fetchPriority).toBe("high");
+  });
+
+  it("returns fill mode props", () => {
+    const { props } = getImageProps({
+      alt: "fill",
+      src: "/bg.png",
+      fill: true,
+    });
+
+    expect(props.width).toBeUndefined();
+    expect(props.height).toBeUndefined();
+    expect(props.sizes).toBe("100vw");
+    expect((props as any)["data-nimg"]).toBe("fill");
+    expect((props.style as any)?.position).toBe("absolute");
+    expect((props.style as any)?.width).toBe("100%");
+    expect((props.style as any)?.height).toBe("100%");
+  });
+
+  it("returns custom loader URL", () => {
+    const loader = ({ src, width }: { src: string; width: number }) =>
+      `https://cdn.example.com${src}?w=${width}`;
+
+    const { props } = getImageProps({
+      alt: "cdn",
+      src: "/photo.jpg",
+      width: 300,
+      height: 200,
+      loader,
+    });
+
+    expect(props.src).toBe("https://cdn.example.com/photo.jpg?w=300");
+  });
+
+  it("returns blur placeholder styles", () => {
+    const { props } = getImageProps({
+      alt: "blur",
+      src: "/photo.jpg",
+      width: 400,
+      height: 300,
+      placeholder: "blur",
+      blurDataURL: "data:image/png;base64,test",
+    });
+
+    expect((props.style as any)?.backgroundImage).toBe("url(data:image/png;base64,test)");
+    expect((props.style as any)?.backgroundSize).toBe("cover");
+  });
+
+  it("merges user style with default", () => {
+    const { props } = getImageProps({
+      alt: "styled",
+      src: "/test.png",
+      width: 100,
+      height: 100,
+      style: { maxWidth: "100%", height: "auto" },
+    });
+
+    expect((props.style as any)?.maxWidth).toBe("100%");
+    expect((props.style as any)?.height).toBe("auto");
+  });
+
+  it("passes through arbitrary props", () => {
+    const { props } = getImageProps({
+      alt: "test",
+      src: "/test.png",
+      width: 100,
+      height: 100,
+      id: "my-image",
+    } as any);
+
+    expect(props.id).toBe("my-image");
+  });
+
+  it("handles StaticImageData", () => {
+    const staticImage: StaticImageData = {
+      src: "/static/photo.png",
+      width: 1920,
+      height: 1080,
+    };
+
+    const { props } = getImageProps({
+      alt: "static",
+      src: staticImage,
+    });
+
+    expect(props.src).toBe(optUrl("/static/photo.png", 1920));
+    expect(props.width).toBe(1920);
+    expect(props.height).toBe(1080);
+  });
+
+  it("generates srcSet for local images", () => {
+    const { props } = getImageProps({
+      alt: "local",
+      src: "/photo.png",
+      width: 800,
+      height: 600,
+    });
+
+    expect(props.srcSet).toBeDefined();
+    expect(props.srcSet).toContain("/_vinext/image");
+    expect(props.srcSet).toContain("photo.png");
+    expect(props.srcSet).toContain("w");
+  });
+
+  it("handles loading=eager prop", () => {
+    const { props } = getImageProps({
+      alt: "eager",
+      src: "/test.png",
+      width: 100,
+      height: 100,
+      loading: "eager",
+    });
+
+    expect(props.loading).toBe("eager");
+  });
+});
+
+// ─── Security: blurDataURL CSS injection ────────────────────────────────
+
+describe("blurDataURL CSS injection prevention", () => {
+  it("rejects blurDataURL with ) character (CSS url breakout)", () => {
+    const { props } = getImageProps({
+      alt: "malicious",
+      src: "/photo.jpg",
+      width: 400,
+      height: 300,
+      placeholder: "blur",
+      blurDataURL: "data:x); color: red; background: url(",
+    });
+
+    // Should NOT have any backgroundImage — the malicious URL is rejected
+    expect((props.style as any)?.backgroundImage).toBeUndefined();
+  });
+
+  it("rejects blurDataURL with ; character (CSS property injection)", () => {
+    const { props } = getImageProps({
+      alt: "malicious",
+      src: "/photo.jpg",
+      width: 400,
+      height: 300,
+      placeholder: "blur",
+      blurDataURL: "data:image/png;base64,abc); color: red; x: url(",
+    });
+
+    // The ; in data:image/png;base64 is fine, but ) breaks out of url()
+    expect((props.style as any)?.backgroundImage).toBeUndefined();
+  });
+
+  it("rejects blurDataURL with { character (CSS rule injection)", () => {
+    const { props } = getImageProps({
+      alt: "malicious",
+      src: "/photo.jpg",
+      width: 400,
+      height: 300,
+      placeholder: "blur",
+      blurDataURL: "data:image/svg+xml,<svg>{</svg>",
+    });
+
+    expect((props.style as any)?.backgroundImage).toBeUndefined();
+  });
+
+  it("rejects blurDataURL that does not start with data:image/", () => {
+    const { props } = getImageProps({
+      alt: "malicious",
+      src: "/photo.jpg",
+      width: 400,
+      height: 300,
+      placeholder: "blur",
+      blurDataURL: "javascript:alert(1)",
+    });
+
+    expect((props.style as any)?.backgroundImage).toBeUndefined();
+  });
+
+  it("accepts valid base64 blurDataURL", () => {
+    const { props } = getImageProps({
+      alt: "valid",
+      src: "/photo.jpg",
+      width: 400,
+      height: 300,
+      placeholder: "blur",
+      blurDataURL:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    });
+
+    expect((props.style as any)?.backgroundImage).toContain("data:image/png;base64,");
+  });
+
+  it("sanitizes blurDataURL in SSR rendering (Image component)", () => {
+    const maliciousURL = "data:x); color: red; background: url(";
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "malicious",
+        src: "/photo.jpg",
+        width: 400,
+        height: 300,
+        placeholder: "blur",
+        blurDataURL: maliciousURL,
+      }),
+    );
+    // Should NOT contain the malicious CSS injection
+    expect(html).not.toContain("color: red");
+    expect(html).not.toContain("color:red");
+    // Should NOT contain any background-image at all (blur was rejected)
+    expect(html).not.toContain("background-image");
+  });
+
+  it("renders valid blurDataURL in SSR", () => {
+    const validURL = "data:image/png;base64,abc123";
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "valid blur",
+        src: "/photo.jpg",
+        width: 400,
+        height: 300,
+        placeholder: "blur",
+        blurDataURL: validURL,
+      }),
+    );
+    expect(html).toContain("background-image");
+    expect(html).toContain(validURL);
+  });
+});
+
+// ─── onLoadingComplete (deprecated but supported) ────────────────────────
+// Next.js deprecated onLoadingComplete in v14 but still supports it.
+// It should be handled internally and NOT leak through to the returned props.
+
+describe("onLoadingComplete prop", () => {
+  it("getImageProps does not leak onLoadingComplete into returned props", () => {
+    const { props } = getImageProps({
+      alt: "test",
+      src: "/photo.jpg",
+      width: 400,
+      height: 300,
+      onLoadingComplete: () => {},
+    });
+    // onLoadingComplete must be consumed internally, not passed through
+    expect((props as any).onLoadingComplete).toBeUndefined();
+  });
+
+  it("getImageProps does not leak onLoad or onLoadingComplete when both provided", () => {
+    const { props } = getImageProps({
+      alt: "test",
+      src: "/photo.jpg",
+      width: 400,
+      height: 300,
+      onLoad: () => {},
+      onLoadingComplete: () => {},
+    });
+    expect((props as any).onLoadingComplete).toBeUndefined();
+    expect((props as any).onLoad).toBeUndefined();
+  });
+
+  it("does not leak onLoadingComplete as a DOM attribute in SSR (local image)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "test",
+        src: "/photo.jpg",
+        width: 400,
+        height: 300,
+        onLoadingComplete: () => {},
+      }),
+    );
+    expect(html).not.toContain("onLoadingComplete");
+    expect(html).not.toContain("onloadingcomplete");
+    expect(html).toContain('alt="test"');
+  });
+
+  it("does not leak onLoadingComplete as a DOM attribute in SSR (custom loader)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "cdn",
+        src: "/photo.jpg",
+        width: 200,
+        height: 150,
+        loader: ({ src, width }: { src: string; width: number }) =>
+          `https://cdn.example.com${src}?w=${width}`,
+        onLoadingComplete: () => {},
+      }),
+    );
+    expect(html).not.toContain("onLoadingComplete");
+    expect(html).not.toContain("onloadingcomplete");
+    expect(html).toContain('alt="cdn"');
+  });
+
+  it("does not leak onLoadingComplete as a DOM attribute in SSR (remote URL)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote",
+        src: "https://example.com/photo.jpg",
+        width: 400,
+        height: 300,
+        onLoadingComplete: () => {},
+      }),
+    );
+    expect(html).not.toContain("onLoadingComplete");
+    expect(html).not.toContain("onloadingcomplete");
+    expect(html).toContain('alt="remote"');
+  });
+});
+
+// ─── Reproduction: priority prop on remote URL paths ────────────────────
+// Regression tests for:
+//   "Received `true` for a non-boolean attribute `priority`."
+// The bug: UnpicImage was receiving priority={true} and leaking it to the
+// DOM <img> element. priority is a Next.js concept; it must be translated to
+// loading="eager" and fetchPriority="high" before reaching the DOM.
+// Affected paths: remote URL with fill=true, and remote URL with width+height.
+
+describe("priority prop — no DOM leak on remote URL paths", () => {
+  it("does not render priority attribute on DOM img (remote URL + width/height)", () => {
+    // Reproduction: this used to emit `priority="true"` on the DOM element,
+    // triggering the React warning about non-boolean attribute.
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote priority",
+        src: "https://images.unsplash.com/photo-1",
+        width: 800,
+        height: 600,
+        priority: true,
+      }),
+    );
+    expect(html).not.toContain("priority=");
+    expect(html).not.toContain('"priority"');
+  });
+
+  it("does not render priority attribute on DOM img (remote URL + fill)", () => {
+    // Reproduction: fill layout path also forwarded priority={true} to UnpicImage.
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote fill priority",
+        src: "https://images.unsplash.com/photo-2",
+        fill: true,
+        priority: true,
+      }),
+    );
+    expect(html).not.toContain("priority=");
+    expect(html).not.toContain('"priority"');
+  });
+
+  it("renders loading=eager for remote URL + width/height when priority=true", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote priority eager",
+        src: "https://images.unsplash.com/photo-3",
+        width: 400,
+        height: 300,
+        priority: true,
+      }),
+    );
+    expect(html).toContain('loading="eager"');
+    expect(html).not.toContain('loading="lazy"');
+  });
+
+  it("renders loading=eager for remote URL + fill when priority=true", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote fill priority eager",
+        src: "https://images.unsplash.com/photo-4",
+        fill: true,
+        priority: true,
+      }),
+    );
+    expect(html).toContain('loading="eager"');
+    expect(html).not.toContain('loading="lazy"');
+  });
+
+  it("renders fetchPriority=high for remote URL + width/height when priority=true", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote priority fetchpriority",
+        src: "https://images.unsplash.com/photo-5",
+        width: 400,
+        height: 300,
+        priority: true,
+      }),
+    );
+    expect(html).toContain("fetchPriority");
+    expect(html).toContain("high");
+  });
+
+  it("defaults to loading=lazy for remote URL when priority is unset", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote lazy",
+        src: "https://images.unsplash.com/photo-6",
+        width: 400,
+        height: 300,
+      }),
+    );
+    expect(html).toContain('loading="lazy"');
+    expect(html).not.toContain("priority=");
+  });
+});
+
+// ─── onLoad / onError single-fire dedup ──────────────────────────────────
+// Ported from Next.js: test/e2e/app-dir/next-image-events/next-image-events.test.ts
+// https://github.com/vercel/next.js/blob/canary/test/e2e/app-dir/next-image-events/next-image-events.test.ts
+//
+// onLoad and onError must fire at most once per src per mount to prevent
+// double-counting failures or infinite re-render loops when user code
+// calls setState inside the event handler. React re-renders that result
+// from state updates inside onError/onLoad must not re-trigger the handler.
+//
+// The dedup is client-side (refs inside useRef). SSR tests verify that
+// onLoad/onError handlers are properly attached to the img element on
+// all render paths without leaking as DOM attributes. Runtime dedup
+// behavior is verified via E2E (Playwright) tests mirroring the Next.js
+// e2e suite — those tests assert that console.log fires exactly once
+// per src across hydration, client render, and re-render.
+
+describe("onLoad / onError handler attachment (SSR)", () => {
+  it("does not leak onLoad as DOM attribute (local image)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "test",
+        src: "/photo.jpg",
+        width: 400,
+        height: 300,
+        onLoad: () => {},
+      }),
+    );
+    expect(html).not.toContain("onload=");
+    expect(html).not.toContain("onLoad=");
+    expect(html).toContain('alt="test"');
+  });
+
+  it("does not leak onError as DOM attribute (local image)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "test",
+        src: "/photo.jpg",
+        width: 400,
+        height: 300,
+        onError: () => {},
+      }),
+    );
+    expect(html).not.toContain("onerror=");
+    expect(html).not.toContain("onError=");
+    expect(html).toContain('alt="test"');
+  });
+
+  it("does not leak onLoad or onError as DOM attributes (custom loader)", () => {
+    const loader = ({ src, width }: { src: string; width: number }) =>
+      `https://cdn.example.com${src}?w=${width}`;
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "cdn",
+        src: "/photo.jpg",
+        width: 200,
+        height: 150,
+        loader,
+        onLoad: () => {},
+        onError: () => {},
+      }),
+    );
+    expect(html).not.toContain("onload=");
+    expect(html).not.toContain("onerror=");
+    expect(html).toContain('alt="cdn"');
+  });
+
+  it("does not leak onLoad or onError as DOM attributes (remote URL + width/height)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote",
+        src: "https://images.unsplash.com/photo-7",
+        width: 400,
+        height: 300,
+        onLoad: () => {},
+        onError: () => {},
+      }),
+    );
+    expect(html).not.toContain("onload=");
+    expect(html).not.toContain("onerror=");
+    expect(html).toContain('alt="remote"');
+  });
+
+  it("does not leak onLoad or onError as DOM attributes (remote URL + fill)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote fill",
+        src: "https://images.unsplash.com/photo-8",
+        fill: true,
+        onLoad: () => {},
+        onError: () => {},
+      }),
+    );
+    expect(html).not.toContain("onload=");
+    expect(html).not.toContain("onerror=");
+    expect(html).toContain('alt="remote fill"');
+  });
+
+  it("renders valid SSR output with both onLoad and onError (local image)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "events",
+        src: "/photo.jpg",
+        width: 400,
+        height: 300,
+        onLoad: () => {},
+        onError: () => {},
+      }),
+    );
+    expect(html).toContain("<img");
+    expect(html).toContain('alt="events"');
+    expect(html).toContain('data-nimg="1"');
+  });
+
+  it("renders valid SSR output with both onLoad and onError (remote URL via UnpicImage)", () => {
+    const html = ReactDOMServer.renderToString(
+      React.createElement(Image, {
+        alt: "remote events",
+        src: "https://images.unsplash.com/photo-9",
+        width: 400,
+        height: 300,
+        onLoad: () => {},
+        onError: () => {},
+      }),
+    );
+    expect(html).toContain("<img");
+    expect(html).toContain('alt="remote events"');
+  });
+});
+
+// ─── dangerouslyAllowLocalIP / private-IP guard ─────────────────────────
+// Ported from Next.js: test/unit/image-optimizer/fetch-external-image.test.ts
+// https://github.com/vercel/next.js/blob/canary/test/unit/image-optimizer/fetch-external-image.test.ts
+
+describe("dangerouslyAllowLocalIP private-IP guard", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = previousNodeEnv;
+    delete process.env.__VINEXT_IMAGE_REMOTE_PATTERNS;
+    delete process.env.__VINEXT_IMAGE_DOMAINS;
+    delete process.env.__VINEXT_IMAGE_DANGEROUSLY_ALLOW_LOCAL_IP;
+  });
+
+  it("blocks private-IP remote URLs in production (Image returns null)", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.__VINEXT_IMAGE_REMOTE_PATTERNS = JSON.stringify([{ hostname: "**" }]);
+    process.env.__VINEXT_IMAGE_DANGEROUSLY_ALLOW_LOCAL_IP = "false";
+
+    // Module-level constants in image.tsx are evaluated at import time from
+    // process.env, so we must re-evaluate the module after changing env.
+    vi.resetModules();
+    const { default: PrivateIpImage } = await import("../packages/vinext/src/shims/image.js");
+
+    const html = ReactDOMServer.renderToString(
+      React.createElement(PrivateIpImage, {
+        alt: "private ip",
+        src: "http://127.0.0.1/photo.jpg",
+        width: 400,
+        height: 300,
+      }),
+    );
+    // Production: blocked → no img tag rendered
+    expect(html).not.toContain("<img");
+  });
+
+  it("blocks private-IP remote URLs in production (getImageProps returns empty src)", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.__VINEXT_IMAGE_REMOTE_PATTERNS = JSON.stringify([{ hostname: "**" }]);
+    process.env.__VINEXT_IMAGE_DANGEROUSLY_ALLOW_LOCAL_IP = "false";
+
+    vi.resetModules();
+    const { getImageProps: privateIpGetImageProps } =
+      await import("../packages/vinext/src/shims/image.js");
+
+    const { props } = privateIpGetImageProps({
+      alt: "private ip",
+      src: "http://192.168.1.1/photo.jpg",
+      width: 400,
+      height: 300,
+    });
+    expect(props.src).toBe("");
+  });
+
+  it("allows private-IP remote URLs when dangerouslyAllowLocalIP = true", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.__VINEXT_IMAGE_REMOTE_PATTERNS = JSON.stringify([{ hostname: "**" }]);
+    process.env.__VINEXT_IMAGE_DANGEROUSLY_ALLOW_LOCAL_IP = "true";
+
+    // Module-level constants in image.tsx are evaluated at import time from
+    // process.env, so we must re-evaluate the module after changing env.
+    vi.resetModules();
+    const { default: PrivateIpImage } = await import("../packages/vinext/src/shims/image.js");
+
+    const html = ReactDOMServer.renderToString(
+      React.createElement(PrivateIpImage, {
+        alt: "private ip allowed",
+        src: "http://10.0.0.1/photo.jpg",
+        width: 400,
+        height: 300,
+      }),
+    );
+    expect(html).toContain("<img");
+    expect(html).toContain('alt="private ip allowed"');
+  });
+
+  it("allows public-IP remote URLs regardless of dangerouslyAllowLocalIP", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.__VINEXT_IMAGE_REMOTE_PATTERNS = JSON.stringify([{ hostname: "**" }]);
+    process.env.__VINEXT_IMAGE_DANGEROUSLY_ALLOW_LOCAL_IP = "false";
+
+    // Module-level constants in image.tsx are evaluated at import time from
+    // process.env, so we must re-evaluate the module after changing env.
+    vi.resetModules();
+    const { default: PrivateIpImage } = await import("../packages/vinext/src/shims/image.js");
+
+    const html = ReactDOMServer.renderToString(
+      React.createElement(PrivateIpImage, {
+        alt: "public ip",
+        src: "http://8.8.8.8/photo.jpg",
+        width: 400,
+        height: 300,
+      }),
+    );
+    expect(html).toContain("<img");
+    expect(html).toContain('alt="public ip"');
+  });
+
+  it("warns but does not block private-IP remote URLs in development", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.__VINEXT_IMAGE_REMOTE_PATTERNS = JSON.stringify([{ hostname: "**" }]);
+    process.env.__VINEXT_IMAGE_DANGEROUSLY_ALLOW_LOCAL_IP = "false";
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Module-level constants in image.tsx are evaluated at import time from
+    // process.env, so we must re-evaluate the module after changing env.
+    vi.resetModules();
+    const { default: PrivateIpImage } = await import("../packages/vinext/src/shims/image.js");
+
+    const html = ReactDOMServer.renderToString(
+      React.createElement(PrivateIpImage, {
+        alt: "private ip dev",
+        src: "http://172.16.0.1/photo.jpg",
+        width: 400,
+        height: 300,
+      }),
+    );
+    // Dev: warn but still render
+    expect(html).toContain("<img");
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("resolved to private IP"));
+
+    warnSpy.mockRestore();
+  });
+});

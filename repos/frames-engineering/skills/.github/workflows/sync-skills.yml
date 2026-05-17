@@ -1,0 +1,67 @@
+name: Sync Skill Files
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create directories
+        run: |
+          mkdir -p skills/agentwallet
+          mkdir -p skills/registry
+          mkdir -p skills/wordspace
+
+      - name: Fetch agentwallet skill
+        run: |
+          curl -fsSL https://agentwallet.mcpay.tech/skill.md -o skills/agentwallet/SKILL.md
+          curl -fsSL https://agentwallet.mcpay.tech/heartbeat.md -o skills/agentwallet/HEARTBEAT.md
+          curl -fsSL https://agentwallet.mcpay.tech/skill.json -o skills/agentwallet/skill.json
+
+      - name: Fetch registry skill
+        run: |
+          curl -fsSL https://registry.mcpay.tech/skill.md -o skills/registry/SKILL.md
+
+      - name: Fetch wordspace skill
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/frames-engineering/wordspace/main/skills/wordspace/SKILL.md -o skills/wordspace/SKILL.md
+
+      - name: Fetch open-prose and websh skills
+        run: |
+          npx -y skills add openprose/prose -y
+          rm -rf skills/open-prose skills/websh
+          cp -r .agents/skills/open-prose skills/open-prose
+          cp -r .agents/skills/websh skills/websh
+          rm -rf .agents .claude
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add skills/
+          if git diff --staged --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: sync skill files"
+          git push

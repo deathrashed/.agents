@@ -1,0 +1,137 @@
+/**
+ * Log Command
+ * View ledger events for a specific spell run
+ */
+
+import { join } from "node:path";
+import { SqliteStateStore } from "@grimoirelabs/core";
+import chalk from "chalk";
+
+interface LogOptions {
+  stateDir?: string;
+}
+
+export async function logCommand(
+  spellId: string,
+  runId: string,
+  options: LogOptions
+): Promise<unknown> {
+  const dbPath = options.stateDir ? join(options.stateDir, "grimoire.db") : undefined;
+
+  const store = new SqliteStateStore({ dbPath });
+
+  try {
+    const entries = await store.loadLedger(spellId, runId);
+
+    if (!entries) {
+      console.error(chalk.dim(`No ledger found for spell "${spellId}" run "${runId}".`));
+
+      // Suggest checking history
+      const runs = await store.getRuns(spellId, 5);
+      if (runs.length > 0) {
+        console.error();
+        console.error(chalk.dim("Recent runs:"));
+        for (const run of runs) {
+          console.error(chalk.dim(`  ${run.runId}`));
+        }
+      }
+      return entries;
+    }
+
+    console.error(
+      chalk.cyan(`Ledger for ${chalk.white(spellId)} run ${chalk.white(runId.slice(0, 8))}:`)
+    );
+    console.error();
+
+    for (const entry of entries) {
+      const time = new Date(entry.timestamp).toISOString().split("T")[1]?.replace("Z", "");
+      const eventType = chalk.blue(entry.event.type.padEnd(24));
+      let details = "";
+
+      switch (entry.event.type) {
+        case "run_started":
+          details = chalk.dim(`spell=${entry.event.spellId}`);
+          break;
+        case "run_completed":
+          details = entry.event.success ? chalk.green("success") : chalk.red("failed");
+          break;
+        case "run_failed":
+          details = chalk.red(entry.event.error);
+          break;
+        case "step_started":
+          details = chalk.dim(`step=${entry.event.stepId} kind=${entry.event.kind}`);
+          break;
+        case "step_completed":
+          details = chalk.dim(`step=${entry.event.stepId}`);
+          break;
+        case "step_failed":
+          details = chalk.red(`step=${entry.event.stepId} error=${entry.event.error}`);
+          break;
+        case "step_skipped":
+          details = chalk.yellow(`step=${entry.event.stepId} reason=${entry.event.reason}`);
+          break;
+        case "binding_set":
+          details = chalk.dim(`${entry.event.name}=${JSON.stringify(entry.event.value)}`);
+          break;
+        case "guard_passed":
+          details = chalk.dim(`guard=${entry.event.guardId}`);
+          break;
+        case "guard_failed":
+          details = chalk.yellow(`guard=${entry.event.guardId} msg=${entry.event.message}`);
+          break;
+        case "action_simulated":
+          details = chalk.dim(`venue=${entry.event.venue}`);
+          break;
+        case "action_submitted":
+          details = chalk.dim(`tx=${entry.event.txHash}`);
+          break;
+        case "action_confirmed":
+          details = chalk.green(`tx=${entry.event.txHash} gas=${entry.event.gasUsed}`);
+          break;
+        case "action_reverted":
+          details = chalk.red(`tx=${entry.event.txHash} reason=${entry.event.reason}`);
+          break;
+        case "event_emitted":
+          details = chalk.dim(`event=${entry.event.event}`);
+          break;
+        case "constraint_evaluated":
+          details = chalk.dim(`step=${entry.event.stepId}`);
+          break;
+        case "track_waiting":
+          details = chalk.yellow(
+            `track=${entry.event.trackId} chain=${entry.event.chainId} reason=${entry.event.reason}`
+          );
+          break;
+        case "track_resumed":
+          details = chalk.dim(`track=${entry.event.trackId} chain=${entry.event.chainId}`);
+          break;
+        case "track_completed":
+          details = entry.event.success
+            ? chalk.green(`track=${entry.event.trackId} chain=${entry.event.chainId}`)
+            : chalk.red(`track=${entry.event.trackId} chain=${entry.event.chainId}`);
+          break;
+        case "handoff_submitted":
+          details = chalk.dim(
+            `handoff=${entry.event.handoffId} step=${entry.event.stepId} submitted=${entry.event.submittedAmount}`
+          );
+          break;
+        case "handoff_settled":
+          details = chalk.green(
+            `handoff=${entry.event.handoffId} settled=${entry.event.settledAmount}`
+          );
+          break;
+        case "handoff_expired":
+          details = chalk.red(`handoff=${entry.event.handoffId} reason=${entry.event.reason}`);
+          break;
+        default:
+          details = chalk.dim(JSON.stringify(entry.event));
+      }
+
+      console.error(`  ${chalk.dim(time)} ${eventType} ${details}`);
+    }
+
+    return entries;
+  } finally {
+    store.close();
+  }
+}

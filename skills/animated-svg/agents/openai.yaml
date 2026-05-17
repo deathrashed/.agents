@@ -1,0 +1,7 @@
+interface:
+  display_name: "Animated SVG"
+  short_description: "Create animated SVGs with SMIL elements"
+  default_prompt: "Use $animated-svg to create a pulsing/rotating/moving SVG animation."
+
+policy:
+  allow_implicit_invocation: true

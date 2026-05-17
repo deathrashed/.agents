@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Senior Mobile - Claude Skills</title>
+  <meta name="description" content="">
+  <link rel="canonical" href="https://borghei.github.io/Claude-Skills/skills/engineering/senior-mobile.html">
+  <meta property="og:title" content="Senior Mobile - Claude Skills">
+  <meta property="og:description" content="">
+  <meta property="og:url" content="https://borghei.github.io/Claude-Skills/skills/engineering/senior-mobile.html">
+  <meta property="og:type" content="website">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Senior Mobile", "description": "", "applicationCategory": "Engineering", "operatingSystem": "Any", "url": "https://borghei.github.io/Claude-Skills/skills/engineering/senior-mobile.html", "author": {"@type": "Person", "name": "borghei"}, "license": "https://opensource.org/licenses/MIT"}</script>
+  <style>
+:root {
+  --bg: #faf9f5;
+  --bg-secondary: #f0eee6;
+  --text: #141413;
+  --text-muted: #5e5d59;
+  --accent: #d97757;
+  --accent-deep: #c6613f;
+  --border: rgba(20,20,19,0.1);
+  --border-strong: rgba(20,20,19,0.18);
+  --white: #ffffff;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, monospace;
+  --max-width: 1200px;
+  --shadow-sm: 0 1px 2px rgba(20,20,19,0.04);
+  --shadow: 0 1px 3px rgba(20,20,19,0.06), 0 1px 2px rgba(20,20,19,0.04);
+  --shadow-md: 0 4px 12px rgba(20,20,19,0.08), 0 1px 3px rgba(20,20,19,0.06);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+a:hover { color: var(--accent-deep); }
+.container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+code { font-family: var(--font-mono); font-size: 0.875em; }
+
+/* Navbar */
+.navbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(250,249,245,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.navbar .container { display: flex; align-items: center; justify-content: space-between; }
+.nav-logo {
+  font-family: var(--font-serif); font-weight: 700; font-size: 1.1rem;
+  color: var(--text); letter-spacing: -0.01em;
+}
+.nav-logo:hover { color: var(--text); }
+.nav-links { display: flex; gap: 28px; align-items: center; }
+.nav-links a {
+  color: var(--text-muted); font-size: 0.9rem; font-weight: 500;
+  transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-links a.active { color: var(--accent); }
+.nav-links a.gh-link { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Breadcrumbs */
+.breadcrumbs { padding: 20px 0 0; font-size: 0.85rem; color: var(--text-muted); }
+.breadcrumbs a { color: var(--text-muted); }
+.breadcrumbs a:hover { color: var(--accent); }
+.breadcrumbs .sep { margin: 0 8px; opacity: 0.4; }
+
+/* Page header */
+.page-header { padding: 48px 0 32px; }
+.page-title {
+  font-family: var(--font-serif); font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 700; margin-bottom: 12px; letter-spacing: -0.02em;
+  color: var(--text);
+}
+.page-subtitle { color: var(--text-muted); max-width: 700px; font-size: 1.05rem; line-height: 1.6; }
+
+/* Count badge (inline with title) */
+.count-badge {
+  display: inline-block; font-family: var(--font-mono); font-size: 0.8rem;
+  color: var(--accent); background: rgba(217,119,87,0.08);
+  padding: 2px 10px; border-radius: 20px; margin-left: 8px;
+  vertical-align: middle; font-weight: 500;
+}
+
+/* Search + Filter */
+.filter-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+.search-input {
+  flex: 1; min-width: 200px; padding: 10px 14px 10px 38px;
+  background: var(--white); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); color: var(--text); font-family: var(--font-sans);
+  font-size: 0.9rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.1); }
+.search-input::placeholder { color: var(--text-muted); }
+.search-wrap { position: relative; flex: 1; min-width: 200px; }
+.search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.filter-select {
+  padding: 10px 14px; background: var(--white); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); color: var(--text); font-family: var(--font-sans);
+  font-size: 0.9rem; outline: none; cursor: pointer;
+}
+.filter-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.1); }
+
+/* Card grid */
+.skills-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-bottom: 60px; }
+.skill-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  display: flex; flex-direction: column;
+}
+.skill-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.skill-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; }
+.skill-card h3 a { color: var(--text); }
+.skill-card h3 a:hover { color: var(--accent); }
+.skill-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; flex: 1; }
+
+/* Badges */
+.badge-bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 6px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 0.7rem; padding: 3px 9px;
+  border-radius: 5px; font-weight: 500; white-space: nowrap;
+}
+.badge-domain { background: rgba(217,119,87,0.1); border: 1px solid rgba(217,119,87,0.2); color: var(--accent-deep); }
+.badge-subdomain { background: rgba(20,20,19,0.04); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-version { background: rgba(20,20,19,0.03); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-tools { background: rgba(20,20,19,0.04); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-refs { background: rgba(217,119,87,0.06); border: 1px solid rgba(217,119,87,0.15); color: var(--accent); }
+
+/* Tags */
+.skill-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tag {
+  font-family: var(--font-mono); font-size: 0.65rem; padding: 2px 8px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text-muted);
+}
+
+/* Example pills on domain summary cards */
+.example-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.example-pill {
+  font-family: var(--font-mono); font-size: 0.65rem; padding: 2px 7px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text-muted);
+}
+
+/* Skill detail page */
+.skill-detail { padding-bottom: 80px; }
+.skill-detail h2 {
+  font-family: var(--font-serif); font-size: 1.4rem; font-weight: 700;
+  margin: 40px 0 16px; padding-top: 16px;
+  border-top: 1px solid var(--border); color: var(--text);
+}
+.skill-detail h3 { font-size: 1.05rem; font-weight: 600; margin: 20px 0 10px; }
+.skill-detail p, .skill-detail li { font-size: 0.95rem; color: var(--text-muted); line-height: 1.7; }
+.skill-detail ul, .skill-detail ol { margin-left: 20px; margin-bottom: 16px; }
+.skill-detail li { margin-bottom: 6px; }
+.skill-detail pre {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; overflow-x: auto;
+  font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.7;
+  color: var(--text); margin: 12px 0 20px;
+}
+.skill-detail code {
+  font-family: var(--font-mono); font-size: 0.85rem;
+  background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px;
+}
+.skill-detail pre code { background: none; padding: 0; }
+
+/* Platform tabs */
+.platform-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+.tab-btn {
+  padding: 10px 18px; font-size: 0.85rem; font-weight: 500;
+  font-family: var(--font-sans); background: none; border: none;
+  border-bottom: 2px solid transparent; color: var(--text-muted);
+  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.tab-content pre {
+  border-top: none; border-radius: 0 0 var(--radius) var(--radius);
+  margin-top: 0;
+}
+
+/* Quick Start prompt cards */
+.prompt-cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  padding: 20px; background: var(--bg-secondary);
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+@media (max-width: 640px) { .prompt-cards { grid-template-columns: 1fr; } }
+.prompt-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.prompt-card-featured { border-color: var(--accent); border-width: 2px; }
+.prompt-card-header { display: flex; align-items: center; justify-content: space-between; }
+.prompt-card-header h3 { font-size: 1rem; font-weight: 700; margin: 0; color: var(--text); }
+.prompt-card-badge {
+  font-size: 0.7rem; font-weight: 600; padding: 3px 8px;
+  border-radius: 4px; background: var(--bg-secondary);
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-featured { background: rgba(217,119,87,0.12); color: var(--accent-deep); }
+.prompt-card-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.5; flex-grow: 1; }
+.copy-btn-featured { background: var(--accent-deep); }
+.prompt-details { margin-top: 4px; }
+.prompt-details summary {
+  font-size: 0.78rem; color: var(--text-muted); cursor: pointer;
+  padding: 4px 0; user-select: none;
+}
+.prompt-details summary:hover { color: var(--accent); }
+.copy-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; font-size: 0.82rem; font-weight: 600;
+  font-family: var(--font-sans);
+  background: var(--accent); color: var(--white);
+  border: none; border-radius: 6px; cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.copy-btn:hover { background: var(--accent-deep); }
+.copy-btn:active { transform: scale(0.97); }
+.copy-btn.copied { background: #2d8a4e; }
+.prompt-preview {
+  max-height: 200px; overflow-y: auto; padding: 16px 18px;
+  font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap;
+  word-wrap: break-word; color: var(--text-muted);
+  background: var(--white); margin: 0; border: none;
+  font-family: var(--font-mono);
+}
+.prompt-hint {
+  padding: 10px 18px; font-size: 0.78rem; color: var(--text-muted);
+  background: var(--bg-secondary); margin: 0; border-top: 1px solid var(--border);
+}
+
+/* Tools list */
+.tool-item {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px; margin-bottom: 10px;
+}
+.tool-item h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 3px; color: var(--text); }
+.tool-item p { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+
+/* Related skills */
+.related-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+
+/* Agents grid */
+.agents-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-bottom: 60px; }
+.agent-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.agent-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.agent-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.agent-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+.agent-card .view-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.8rem; margin-top: 10px; color: var(--accent);
+}
+
+/* Commands grid */
+.commands-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding-bottom: 60px; }
+.command-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.command-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.command-card h3 {
+  font-family: var(--font-mono); font-size: 0.95rem; font-weight: 600;
+  margin-bottom: 6px; color: var(--accent);
+}
+.command-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+.command-card .view-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.8rem; margin-top: 10px; color: var(--accent);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px; border-radius: var(--radius); font-size: 0.875rem;
+  font-weight: 500; font-family: var(--font-sans);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  text-decoration: none;
+}
+.btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn-primary:hover { background: #2a2a28; color: var(--bg); box-shadow: var(--shadow); }
+.btn-secondary { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.btn-secondary:hover { background: var(--bg-secondary); color: var(--text); box-shadow: var(--shadow-sm); }
+
+/* Section heading */
+.section-heading {
+  font-family: var(--font-serif); font-size: 1.25rem; font-weight: 700;
+  margin-bottom: 20px; color: var(--text);
+}
+
+/* Footer */
+.footer {
+  padding: 36px 0; border-top: 1px solid var(--border); margin-top: 40px;
+  background: var(--bg);
+}
+.footer-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.footer-links {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 0.85rem; color: var(--text-muted);
+}
+.footer-links a { color: var(--text-muted); }
+.footer-links a:hover { color: var(--accent); }
+.footer-sep { color: var(--border-strong); }
+.footer-credit { font-size: 0.85rem; color: var(--text-muted); }
+.footer-credit a { color: var(--text); font-weight: 600; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .skills-grid, .agents-grid, .related-grid { grid-template-columns: repeat(2, 1fr); }
+  .commands-grid { grid-template-columns: 1fr; }
+  .nav-links { gap: 16px; }
+  .platform-tabs { overflow-x: auto; }
+  .tab-btn { padding: 8px 12px; font-size: 0.8rem; white-space: nowrap; }
+}
+@media (max-width: 480px) {
+  .skills-grid, .agents-grid, .related-grid { grid-template-columns: 1fr; }
+  .filter-bar { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="https://borghei.github.io/Claude-Skills/" class="nav-logo">Claude Skills</a>
+    <div class="nav-links">
+      <a href="https://borghei.github.io/Claude-Skills/skills/" class="active">Skills</a>
+      <a href="https://borghei.github.io/Claude-Skills/agents/">Agents</a>
+      <a href="https://borghei.github.io/Claude-Skills/commands/">Commands</a>
+      <a href="https://github.com/borghei/Claude-Skills" target="_blank" rel="noopener" class="gh-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
+    </div>
+  </div>
+</nav>
+<div class="breadcrumbs container"><a href="https://borghei.github.io/Claude-Skills/">Home</a><span class=sep>/</span><a href="https://borghei.github.io/Claude-Skills/skills/">Skills</a><span class=sep>/</span><a href="https://borghei.github.io/Claude-Skills/skills/engineering/">Engineering</a><span class=sep>/</span><span>Senior Mobile</span></div>
+<main class="container">
+
+<article class="skill-detail">
+  <div class="page-header">
+    <h1 class="page-title">Senior Mobile</h1>
+    <p class="page-subtitle"></p>
+    <div class="badge-bar"><span class="badge badge-domain">Engineering</span> <span class="badge badge-subdomain">Mobile Development</span> <span class="badge badge-version">v1.0.0</span> <span class="badge badge-tools"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> 3 tools</span> <span class="badge badge-refs">references</span></div>
+    <div class="skill-meta" style="margin-bottom:24px"><span class="tag">mobile</span><span class="tag">ios</span><span class="tag">android</span><span class="tag">react-native</span><span class="tag">flutter</span><span class="tag">swift</span><span class="tag">kotlin</span></div>
+  </div>
+  <h2>How to Use</h2>
+<div class="platform-tabs">
+  <button class="tab-btn active" data-tab="quickstart">Quick Start</button>
+  <button class="tab-btn" data-tab="claude">Claude Code</button>
+  <button class="tab-btn" data-tab="codex">Codex</button>
+  <button class="tab-btn" data-tab="gemini">Gemini CLI</button>
+  <button class="tab-btn" data-tab="cursor">Cursor</button>
+  <button class="tab-btn" data-tab="manual">Manual</button>
+</div>
+<div class="tab-content active" id="tab-quickstart">
+  <div class="prompt-cards">
+    <div class="prompt-card">
+      <div class="prompt-card-header">
+        <h3>Try in Chat</h3>
+        <span class="prompt-card-badge">Quick</span>
+      </div>
+      <p class="prompt-card-desc">Paste into any AI chat for instant expertise. Works in one conversation -- no setup needed.</p>
+      <button class="copy-btn" onclick="copyPrompt(this)" data-prompt="You are an expert Senior Mobile (Engineering domain).
+
+Expert mobile application development across iOS, Android, React Native, and Flutter. mobile, ios, android, react-native, flutter, swift, kotlin, swiftui, jetpack-compose, expo-router, zustand, app-store, performance, offline-first
+
+## Your Key Capabilities
+- `mobile_scaffold.py`
+- `store_metadata_generator.py`
+- `app_performance_analyzer.py`
+
+## Frameworks &amp; Templates You Know
+- | UI Framework | SwiftUI/UIKit | Compose/XML | React | Widgets |
+
+## How to Help
+When the user asks for help in this domain:
+1. Ask clarifying questions to understand their context
+2. Apply the relevant framework or workflow from your expertise
+3. Provide actionable, specific output (not generic advice)
+4. Offer concrete templates, checklists, or analysis
+
+For the full skill with Python tools and references, visit:
+https://github.com/borghei/Claude-Skills/tree/main/senior-mobile
+
+---
+Start by asking the user what they need help with.">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> <span>Copy Prompt</span>
+      </button>
+      <details class="prompt-details">
+        <summary>Preview prompt</summary>
+        <pre class="prompt-preview">You are an expert Senior Mobile (Engineering domain).
+
+Expert mobile application development across iOS, Android, React Native, and Flutter. mobile, ios, android, react-native, flutter, swift, kotlin, swiftui, jetpack-compose, expo-router, zustand, app-store, performance, offline-first
+
+## Your Key Capabilities
+- `mobile_scaffold.py`
+- `store_metadata_generator.py`
+- `app_performance_analyzer.py`
+
+## Frameworks &amp; Templates You Know
+- | UI Framework | SwiftUI/UIKit | Compose/XML | React | Widgets |
+
+## How to Help
+When the user asks for help in this domain:
+1. Ask clarifying questions to understand their context
+2. Apply the relevant framework or workflow from your expertise
+3. Provide actionable, specific output (not generic advice)
+4. Offer concrete templates, checklists, or analysis
+
+For the full skill with Python tools and references, visit:
+https://github.com/borghei/Claude-Skills/tree/main/senior-mobile
+
+---
+Start by asking the user what they need help with.</pre>
+      </details>
+    </div>
+    <div class="prompt-card prompt-card-featured">
+      <div class="prompt-card-header">
+        <h3>Add to My AI</h3>
+        <span class="prompt-card-badge badge-featured">Full Skill</span>
+      </div>
+      <p class="prompt-card-desc">Creates a permanent Claude Project or Custom GPT with the complete skill. The AI will guide you through setup step by step.</p>
+      <button class="copy-btn copy-btn-featured" onclick="copyPrompt(this)" data-prompt="# Create a &quot;Senior Mobile&quot; AI Skill
+
+I want you to help me set up a reusable AI skill that I can use in future conversations. Read the complete skill definition below, then help me install it.
+
+## Complete Skill Definition
+
+# Senior Mobile Developer
+
+Expert mobile application development across iOS, Android, React Native, and Flutter.
+
+## Keywords
+
+mobile, ios, android, react-native, flutter, swift, kotlin, swiftui,
+jetpack-compose, expo-router, zustand, app-store, performance, offline-first
+
+---
+
+## Quick Start
+
+```bash
+# Scaffold a React Native project
+python scripts/mobile_scaffold.py --platform react-native --name MyApp
+
+# Build for production
+python scripts/build.py --platform ios --env production
+
+# Generate App Store metadata
+python scripts/store_metadata.py --screenshots ./screenshots
+
+# Profile rendering performance
+python scripts/profile.py --platform android --output report.html
+```
+
+---
+
+## Tools
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/mobile_scaffold.py` | Scaffold project for react-native, ios, android, or flutter |
+| `scripts/build.py` | Build automation with environment and platform flags |
+| `scripts/store_metadata.py` | Generate App Store / Play Store listing metadata |
+| `scripts/profile.py` | Profile rendering, memory, and startup performance |
+
+---
+
+## Platform Decision Matrix
+
+| Aspect | Native iOS | Native Android | React Native | Flutter |
+|--------|-----------|----------------|--------------|---------|
+| Language | Swift | Kotlin | TypeScript | Dart |
+| UI Framework | SwiftUI/UIKit | Compose/XML | React | Widgets |
+| Performance | Best | Best | Good | Very Good |
+| Code Sharing | None | None | ~80% | ~95% |
+| Best For | iOS-only, hardware-heavy | Android-only, hardware-heavy | Web team, shared logic | Maximum code sharing |
+
+---
+
+## Workflow 1: Scaffold a React Native App (Expo Router)
+
+1. **Generate project** -- `python scripts/mobile_scaffold.py --platform react-native --name MyApp`
+2. **Verify directory structure** matches this layout:
+   ```
+   src/
+   ├── app/              # Expo Router file-based routes
+   │   ├── (tabs)/       # Tab navigation group
+   │   ├── auth/         # Auth screens
+   │   └── _layout.tsx   # Root layout
+   ├── components/
+   │   ├── ui/           # Reusable primitives (Button, Input, Card)
+   │   └── features/     # Domain components (ProductCard, UserAvatar)
+   ├── hooks/            # Custom hooks (useAuth, useApi)
+   ├── services/         # API clients and storage
+   ├── stores/           # Zustand state stores
+   └── utils/            # Helpers
+   ```
+3. **Configure navigation** in `app/_layout.tsx` with Stack and Tabs.
+4. **Set up state management** with Zustand + AsyncStorage persistence.
+5. **Validate** -- Run the app on both iOS simulator and Android emulator. Confirm navigation and state persistence work.
+
+## Workflow 2: Build a SwiftUI Feature (iOS)
+
+1. **Create the View** using `NavigationStack`, `@StateObject` for ViewModel binding, and `.task` for async data loading.
+2. **Create the ViewModel** as `@MainActor class` with `@Published` properties. Inject services via protocol for testability.
+3. **Wire data flow**: View observes ViewModel -&gt; ViewModel calls Service -&gt; Service returns data -&gt; ViewModel updates `@Published` -&gt; View re-renders.
+4. **Add search/refresh**: `.searchable(text:)` for filtering, `.refreshable` for pull-to-refresh.
+5. **Validate** -- Run in Xcode previews first, then simulator. Confirm async loading, error states, and empty states all render correctly.
+
+### Example: SwiftUI ViewModel Pattern
+
+```swift
+@MainActor
+class ProductListViewModel: ObservableObject {
+    @Published private(set) var products: [Product] = []
+    @Published private(set) var isLoading = false
+    @Published private(set) var error: Error?
+
+    private let service: ProductServiceProtocol
+
+    init(service: ProductServiceProtocol = ProductService()) {
+        self.service = service
+    }
+
+    func loadProducts() async {
+        isLoading = true
+        error = nil
+        do {
+            products = try await service.fetchProducts()
+        } catch {
+            self.error = error
+        }
+        isLoading = false
+    }
+}
+```
+
+## Workflow 3: Build a Jetpack Compose Feature (Android)
+
+1. **Create the Composable screen** with `Scaffold`, `TopAppBar`, and state collection via `collectAsStateWithLifecycle()`.
+2. **Handle UI states** with a sealed interface: `Loading`, `Success&lt;T&gt;`, `Error`.
+3. **Create the ViewModel** with `@HiltViewModel`, `MutableStateFlow`, and repository injection.
+4. **Build list UI** using `LazyColumn` with `key` parameter for stable identity and `Arrangement.spacedBy()` for spacing.
+5. **Validate** -- Run on emulator. Confirm state transitions (loading -&gt; success, loading -&gt; error -&gt; retry) work correctly.
+
+### Example: Compose UiState Pattern
+
+```kotlin
+sealed interface UiState&lt;out T&gt; {
+    data object Loading : UiState&lt;Nothing&gt;
+    data class Success&lt;T&gt;(val data: T) : UiState&lt;T&gt;
+    data class Error(val message: String) : UiState&lt;Nothing&gt;
+}
+
+@HiltViewModel
+class ProductListViewModel @Inject constructor(
+    private val repository: ProductRepository
+) : ViewModel() {
+    private val _uiState = MutableStateFlow&lt;UiState&lt;List&lt;Product&gt;&gt;&gt;(UiState.Loading)
+    val uiState: StateFlow&lt;UiState&lt;List&lt;Product&gt;&gt;&gt; = _uiState.asStateFlow()
+
+    fun loadProducts() {
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            repository.getProducts()
+                .catch { e -&gt; _uiState.value = UiState.Error(e.message ?: &quot;Unknown error&quot;) }
+                .collect { products -&gt; _uiState.value = UiState.Success(products) }
+        }
+    }
+}
+```
+
+## Workflow 4: Optimize Mobile Performance
+
+1. **Profile** -- `python scripts/profile.py --platform &lt;ios|android&gt; --output report.html`
+2. **Apply React Native optimizations:**
+   - Use `FlatList` with `keyExtractor`, `initialNumToRender=10`, `windowSize=5`, `removeClippedSubviews=true`
+   - Memoize components with `React.memo` and handlers with `useCallback`
+   - Supply `getItemLayout` for fixed-height rows to skip measurement
+3. **Apply native iOS optimizations:**
+   - Implement `prefetchItemsAt` for image pre-loading in collection views
+4. **Apply native Android optimizations:**
+   - Set `setHasFixedSize(true)` and `setItemViewCacheSize(20)` on RecyclerViews
+5. **Validate** -- Re-run profiler and confirm frame drops reduced and startup time improved.
+
+## Workflow 5: Submit to App Store / Play Store
+
+1. **Generate metadata** -- `python scripts/store_metadata.py --screenshots ./screenshots`
+2. **Build release** -- `python scripts/build.py --platform ios --env production`
+3. **Review** the generated listing (title, description, keywords, screenshots).
+4. **Upload** via Xcode (iOS) or Play Console (Android).
+5. **Validate** -- Monitor review status and address any rejection feedback.
+
+---
+
+## Reference Materials
+
+| Document | Path |
+|----------|------|
+| React Native Guide | [references/react_native_guide.md](references/react_native_guide.md) |
+| iOS Patterns | [references/ios_patterns.md](references/ios_patterns.md) |
+| Android Patterns | [references/android_patterns.md](references/android_patterns.md) |
+| App Store Guide | [references/app_store_guide.md](references/app_store_guide.md) |
+| Full Code Examples | [REFERENCE.md](REFERENCE.md) |
+
+---
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| App crashes on launch after adding a new dependency | Incompatible native module version or missing pod install / gradle sync | Run `npx pod-install` (iOS) or `cd android &amp;&amp; ./gradlew clean` (Android). Verify dependency version compatibility in the changelog. |
+| FlatList renders blank or flickers | Missing `keyExtractor`, unstable keys, or inline `renderItem` causing full re-renders | Add a stable `keyExtractor`, wrap `renderItem` in `useCallback`, and supply `getItemLayout` for fixed-height rows. |
+| iOS build fails with &quot;signing&quot; error | Provisioning profile mismatch or expired certificate | Open Xcode &gt; Signing &amp; Capabilities, select the correct team and profile. Run `security find-identity -v -p codesigning` to verify certificates. |
+| Android build OOM during dexing | Insufficient JVM heap for large projects | Add `org.gradle.jvmargs=-Xmx4096m` to `gradle.properties`. Enable `dexOptions { javaMaxHeapSize &quot;4g&quot; }` in `build.gradle`. |
+| App Store rejection for missing privacy manifest | Apple requires PrivacyInfo.xcprivacy for apps using required reason APIs (UserDefaults, file timestamp, etc.) | Add a `PrivacyInfo.xcprivacy` file declaring each required reason API. Run `store_metadata_generator.py` to review privacy label guidance. |
+| Slow cold start time (&gt;3 seconds) | Too many synchronous operations on the main thread at launch, large bundle size, or unoptimized images | Defer non-critical initialization, lazy-load modules, compress images, and use `app_performance_analyzer.py` to identify bottlenecks. |
+| Hot reload / fast refresh stops working | Syntax error in a module boundary, anonymous default export, or class component state | Check terminal for error messages, ensure named exports, and restart the Metro bundler or Flutter daemon with a cache clear. |
+
+---
+
+## Success Criteria
+
+- **App startup time under 2 seconds** on cold launch (measured on mid-range devices, both iOS and Android).
+- **Crash-free rate above 99.5%** across all supported OS versions, tracked via Crashlytics or Sentry.
+- **Frame rendering at 60 fps** (16ms per frame) for scrolling lists and animations, with zero jank frames during typical user flows.
+- **Bundle size under 50 MB** for the initial download (excluding on-demand resources), verified before each release.
+- **Performance analyzer score of 75+** (Grade B or above) when running `app_performance_analyzer.py` against the project.
+- **Zero critical issues** and fewer than 5 warnings reported by the performance analyzer before submitting to app stores.
+- **App Store / Play Store approval on first submission** with complete metadata, correct privacy labels, and proper age rating, validated using `store_metadata_generator.py`.
+
+---
+
+## Scope &amp; Limitations
+
+**This skill covers:**
+- Scaffolding production-ready mobile projects for React Native (Expo Router), Flutter, iOS native (SwiftUI), and Android native (Jetpack Compose).
+- Static performance analysis including image asset sizing, re-render detection, memory leak patterns, and bundle size estimation.
+- App Store and Play Store metadata generation including titles, keywords, privacy labels, age ratings, and submission checklists.
+- Platform-specific architecture patterns (MVVM, state management, navigation).
+
+**This skill does NOT cover:**
+- Backend API development or server-side logic (see `senior-backend` and `senior-fullstack` skills).
+- CI/CD pipeline configuration for mobile builds and automated distribution (see `senior-devops` and `release-orchestrator` skills).
+- UI/UX design systems, accessibility auditing, or design token management (see `senior-frontend` and `design-auditor` skills).
+- Runtime profiling with native tools (Xcode Instruments, Android Studio Profiler) -- the analyzer performs static code analysis only, not live device profiling.
+
+---
+
+## Integration Points
+
+| Skill | Integration | Data Flow |
+|-------|-------------|-----------|
+| `senior-frontend` | Shared component patterns, styling conventions, and responsive design principles for React Native web targets | Frontend design tokens and component APIs feed into mobile UI components |
+| `senior-backend` | API contract definitions, authentication flows, and data models consumed by mobile clients | Backend OpenAPI specs define mobile service layer interfaces |
+| `senior-devops` | Build pipelines, code signing automation, and deployment workflows for mobile releases | Mobile build artifacts flow into CI/CD pipelines for TestFlight / Play Console distribution |
+| `senior-qa` | Test strategy alignment, device matrix coverage, and E2E testing patterns for mobile screens | QA test plans drive device coverage; mobile scaffold includes test directory structure |
+| `senior-security` | Secure storage patterns (Keychain/Keystore), certificate pinning, and data encryption for mobile apps | Security requirements inform Keychain helper implementation and network client configuration |
+| `release-orchestrator` | Version bumping, changelog generation, and coordinated release across iOS and Android | Release metadata and version info flow from orchestrator into store submission workflow |
+
+---
+
+## Tool Reference
+
+### `mobile_scaffold.py`
+
+**Purpose:** Scaffold a production-ready mobile project with proper directory structure, navigation setup, state management, and base configuration files.
+
+**Usage:**
+```bash
+python scripts/mobile_scaffold.py &lt;name&gt; --platform &lt;platform&gt; [options]
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | positional | Yes | -- | Project name, used as the directory name |
+| `--platform`, `-p` | choice | Yes | -- | Target platform: `android-native`, `flutter`, `ios-native`, `react-native` |
+| `--typescript`, `-t` | flag | No | `False` (auto-enabled for react-native) | Use TypeScript (React Native only) |
+| `--state`, `-s` | string | No | `none` | State management library. React Native: `zustand`, `redux`, `jotai`, `none`. Flutter: `riverpod`, `bloc`, `provider`, `none`. Not applicable for native platforms. |
+| `--output-dir`, `-o` | path | No | `.` (current directory) | Parent directory for the generated project |
+| `--json` | flag | No | `False` | Output result as JSON instead of human-readable summary |
+
+**Example:**
+```bash
+# Scaffold a React Native app with Zustand state management
+python scripts/mobile_scaffold.py MyApp --platform react-native --state zustand
+
+# Scaffold a Flutter app with Riverpod, output as JSON
+python scripts/mobile_scaffold.py my-flutter-app --platform flutter --state riverpod --json
+
+# Scaffold an iOS native app in a specific directory
+python scripts/mobile_scaffold.py HealthTracker --platform ios-native --output-dir ~/Projects
+```
+
+**Output Formats:**
+- **Human-readable (default):** Prints the project name, platform, state management choice, created directory path, and a list of all generated files.
+- **JSON (`--json`):** Returns a JSON object with `project_name`, `platform`, `typescript`, `state_management`, `output_directory`, `files_created`, and `generated_at` fields.
+
+---
+
+### `store_metadata_generator.py`
+
+**Purpose:** Generate structured metadata for App Store (iOS) and Google Play Store (Android) submissions, including title variants, keywords, category recommendations, privacy labels, age rating guidance, and submission checklists.
+
+**Usage:**
+```bash
+python scripts/store_metadata_generator.py --app-name &lt;name&gt; --category &lt;category&gt; --features &lt;features&gt; [options]
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `--app-name` | string | Yes | -- | The app name for store listings |
+| `--category` | choice | Yes | -- | Primary app category. Choices: `business`, `education`, `entertainment`, `finance`, `food`, `games`, `health`, `lifestyle`, `music`, `navigation`, `news`, `photo`, `productivity`, `shopping`, `social`, `sports`, `travel`, `utilities`, `weather` |
+| `--features` | string | Yes | -- | Comma-separated list of features (e.g., `&quot;offline,sync,biometric&quot;`). Recognized features expand into keywords and trigger privacy/age-rating guidance. |
+| `--description` | string | No | `&quot;&quot;` | Short app description used in generated store copy |
+| `--json` | flag | No | `False` | Output results as JSON |
+
+**Example:**
+```bash
+# Generate metadata for a health app
+python scripts/store_metadata_generator.py --app-name &quot;FitTrack&quot; --category health --features &quot;workout,tracking,social&quot; --description &quot;Track your workouts&quot;
+
+# JSON output for CI integration
+python scripts/store_metadata_generator.py --app-name &quot;BudgetPal&quot; --category finance --features &quot;payment,offline,biometric,push&quot; --json
+```
+
+**Output Formats:**
+- **Human-readable (default):** Formatted report with sections for Title Variants, Keywords (with iOS 100-char field), Store Categories, Privacy Labels / Data Safety, Age Rating Guidance, and Submission Checklist.
+- **JSON (`--json`):** Full metadata object including `titles`, `keywords`, `categories`, `descriptions`, `privacy_labels`, `age_rating`, `screenshot_specs`, and `submission_checklist`.
+
+---
+
+### `app_performance_analyzer.py`
+
+**Purpose:** Analyze a mobile project directory for common performance issues including oversized image assets, re-render patterns, memory leak patterns, bundle size estimation, and platform-specific anti-patterns.
+
+**Usage:**
+```bash
+python scripts/app_performance_analyzer.py &lt;project_dir&gt; [options]
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `project_dir` | positional | Yes | -- | Path to the mobile project directory to analyze |
+| `--platform`, `-p` | choice | No | Auto-detected | Target platform: `react-native`, `flutter`, `ios-native`, `android-native`. Auto-detected from project files if omitted. |
+| `--json` | flag | No | `False` | Output results as JSON |
+
+**Example:**
+```bash
+# Analyze with auto-detected platform
+python scripts/app_performance_analyzer.py ./my-app
+
+# Analyze a React Native project explicitly
+python scripts/app_performance_analyzer.py ./my-app --platform react-native
+
+# JSON output for CI pipeline integration
+python scripts/app_performance_analyzer.py ./my-app --platform flutter --json
+```
+
+**Output Formats:**
+- **Human-readable (default):** Performance score (0-100 with letter grade), issue summary (critical/warning/info counts), bundle size estimate, detailed issues grouped by category, and platform-specific recommendations.
+- **JSON (`--json`):** Full report object including `performance_score`, `summary`, `bundle_estimate` (source code size, asset size, file counts), `issues_by_category`, and the flat `issues` array with `category`, `severity`, `file`, `line`, and `message` per issue.
+
+---
+
+## What I Need You to Do
+
+First, detect which platform I&#x27;m using (Claude.ai, ChatGPT, etc.) and follow the matching instructions below.
+
+### If I&#x27;m on Claude.ai:
+
+Walk me through these exact steps:
+
+1. **Create the Project:** Tell me to go to **claude.ai &gt; Projects &gt; Create project** and name it **&quot;Senior Mobile&quot;**
+
+2. **Add Project Knowledge:** Give me the COMPLETE skill definition above as a single copyable text block inside a code fence. Tell me to click **&quot;Add content&quot; &gt; &quot;Add text content&quot;** inside the project, then paste that entire block. Do NOT say &quot;paste from above&quot; -- give me the actual text to copy right there.
+
+3. **Set Custom Instructions:** Tell me to open project settings and paste this exact instruction:
+   &quot;You are an expert Senior Mobile in the Engineering domain. Use the project knowledge as your expertise. Follow the workflows, frameworks, and templates defined there. Always provide specific, actionable output.&quot;
+
+4. **Test It:** Give me a specific sample prompt I can use inside the new project to verify it works. Pick a real task from the skill&#x27;s workflows.
+
+### If I&#x27;m on ChatGPT:
+
+Walk me through these exact steps:
+
+1. **Create a Custom GPT:** Tell me to go to **chatgpt.com &gt; Explore GPTs &gt; Create**
+2. **Configure it:**
+   - Name: **&quot;Senior Mobile&quot;**
+   - Description: &quot;&quot;
+   - Instructions: Give me the COMPLETE skill definition above as a single copyable text block inside a code fence to paste into the Instructions field. Do NOT say &quot;paste from above.&quot;
+3. **Test It:** Give me a sample prompt to verify it works.
+
+### If I&#x27;m on another platform:
+Ask which tool I&#x27;m using and adapt the instructions accordingly.
+
+## Important
+- Always provide the full skill text in a ready-to-copy code block -- never tell me to &quot;scroll up&quot; or &quot;copy from above&quot;
+- Keep the setup steps simple and numbered
+- After setup, test it with me using a real workflow from the skill
+
+Source: https://github.com/borghei/Claude-Skills/tree/main/engineering/senior-mobile/SKILL.md">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> <span>Copy &amp; Create Skill</span>
+      </button>
+      <details class="prompt-details">
+        <summary>Preview prompt</summary>
+        <pre class="prompt-preview"># Create a &quot;Senior Mobile&quot; AI Skill
+
+I want you to help me set up a reusable AI skill that I can use in future conversations. Read the complete skill definition below, then help me install it.
+
+## Complete Skill Definition
+
+# Senior Mobile Developer
+
+Expert mobile application development across iOS, Android, React Native, and Flutter.
+
+## Keywords
+
+mobile, ios, android, react-native, flutter, swift, kotlin, swiftui,
+jetpack-compose, expo-router, zustand, app-store, performance, offline-first
+
+---
+
+## Quick Start
+
+```bash
+# Scaffold a React Native project
+python scripts/mobile_scaffold.py --platform react-native --name MyApp
+
+# Build for production
+python scripts/build.py --platform ios --env production
+
+# Generate App Store metadata
+python scripts/store_metadata.py --screenshots ./screenshots
+
+# Profile rendering performance
+python scripts/profile.py --platform android --output report.html
+```
+
+---
+
+## Tools
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/mobile_scaffold.py` | Scaffold project for react-native, ios, android, or flutter |
+| `scripts/build.py` | Build automation with environment and platform flags |
+| `scripts/store_metadata.py` | Generate App Store / Play Store listing metadata |
+| `scripts/profile.py` | Profile rendering, memory, and startup performance |
+
+---
+
+## Platform Decision Matrix
+
+| Aspect | Native iOS | Native Android | React Native | Flutter |
+|--------|-----------|----------------|--------------|---------|
+| Language | Swift | Kotlin | TypeScript | Dart |
+| UI Framework | SwiftUI/UIKit | Compose/XML | React | Widgets |
+| Performance | Best | Best | Good | Very Good |
+| Code Sharing | None | None | ~80% | ~95% |
+| Best For | iOS-only, hardware-heavy | Android-only, hardware-heavy | Web team, shared logic | Maximum code sharing |
+
+---
+
+## Workflow 1: Scaffold a React Native App (Expo Router)
+
+1. **Generate project** -- `python scripts/mobile_scaffold.py --platform react-native --name MyApp`
+2. **Verify directory structure** matches this layout:
+   ```
+   src/
+   ├── app/              # Expo Router file-based routes
+   │   ├── (tabs)/       # Tab navigation group
+   │   ├── auth/         # Auth screens
+   │   └── _layout.tsx   # Root layout
+   ├── components/
+   │   ├── ui/           # Reusable primitives (Button, Input, Card)
+   │   └── features/     # Domain components (ProductCard, UserAvatar)
+   ├── hooks/            # Custom hooks (useAuth, useApi)
+   ├── services/         # API clients and storage
+   ├── stores/           # Zustand state stores
+   └── utils/            # Helpers
+   ```
+3. **Configure navigation** in `app/_layout.tsx` with Stack and Tabs.
+4. **Set up state management** with Zustand + AsyncStorage persistence.
+5. **Validate** -- Run the app on both iOS simulator and Android emulator. Confirm navigation and state persistence work.
+
+## Workflow 2: Build a SwiftUI Feature (iOS)
+
+1. **Create the View** using `NavigationStack`, `@StateObject` for ViewModel binding, and `.task` for async data loading.
+2. **Create the ViewModel** as `@MainActor class` with `@Published` properties. Inject services via protocol for testability.
+3. **Wire data flow**: View observes ViewModel -&gt; ViewModel calls Service -&gt; Service returns data -&gt; ViewModel updates `@Published` -&gt; View re-renders.
+4. **Add search/refresh**: `.searchable(text:)` for filtering, `.refreshable` for pull-to-refresh.
+5. **Validate** -- Run in Xcode previews first, then simulator. Confirm async loading, error states, and empty states all render correctly.
+
+### Example: SwiftUI ViewModel Pattern
+
+```swift
+@MainActor
+class ProductListViewModel: ObservableObject {
+    @Published private(set) var products: [Product] = []
+    @Published private(set) var isLoading = false
+    @Published private(set) var error: Error?
+
+    private let service: ProductServiceProtocol
+
+    init(service: ProductServiceProtocol = ProductService()) {
+        self.service = service
+    }
+
+    func loadProducts() async {
+        isLoading = true
+        error = nil
+        do {
+            products = try await service.fetchProducts()
+        } catch {
+            self.error = error
+        }
+        isLoading = false
+    }
+}
+```
+
+## Workflow 3: Build a Jetpack Compose Feature (Android)
+
+1. **Create the Composable screen** with `Scaffold`, `TopAppBar`, and state collection via `collectAsStateWithLifecycle()`.
+2. **Handle UI states** with a sealed interface: `Loading`, `Success&lt;T&gt;`, `Error`.
+3. **Create the ViewModel** with `@HiltViewModel`, `MutableStateFlow`, and repository injection.
+4. **Build list UI** using `LazyColumn` with `key` parameter for stable identity and `Arrangement.spacedBy()` for spacing.
+5. **Validate** -- Run on emulator. Confirm state transitions (loading -&gt; success, loading -&gt; error -&gt; retry) work correctly.
+
+### Example: Compose UiState Pattern
+
+```kotlin
+sealed interface UiState&lt;out T&gt; {
+    data object Loading : UiState&lt;Nothing&gt;
+    data class Success&lt;T&gt;(val data: T) : UiState&lt;T&gt;
+    data class Error(val message: String) : UiState&lt;Nothing&gt;
+}
+
+@HiltViewModel
+class ProductListViewModel @Inject constructor(
+    private val repository: ProductRepository
+) : ViewModel() {
+    private val _uiState = MutableStateFlow&lt;UiState&lt;List&lt;Product&gt;&gt;&gt;(UiState.Loading)
+    val uiState: StateFlow&lt;UiState&lt;List&lt;Product&gt;&gt;&gt; = _uiState.asStateFlow()
+
+    fun loadProducts() {
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            repository.getProducts()
+                .catch { e -&gt; _uiState.value = UiState.Error(e.message ?: &quot;Unknown error&quot;) }
+                .collect { products -&gt; _uiState.value = UiState.Success(products) }
+        }
+    }
+}
+```
+
+## Workflow 4: Optimize Mobile Performance
+
+1. **Profile** -- `python scripts/profile.py --platform &lt;ios|android&gt; --output report.html`
+2. **Apply React Native optimizations:**
+   - Use `FlatList` with `keyExtractor`, `initialNumToRender=10`, `windowSize=5`, `removeClippedSubviews=true`
+   - Memoize components with `React.memo` and handlers with `useCallback`
+   - Supply `getItemLayout` for fixed-height rows to skip measurement
+3. **Apply native iOS optimizations:**
+   - Implement `prefetchItemsAt` for image pre-loading in collection views
+4. **Apply native Android optimizations:**
+   - Set `setHasFixedSize(true)` and `setItemViewCacheSize(20)` on RecyclerViews
+5. **Validate** -- Re-run profiler and confirm frame drops reduced and startup time improved.
+
+## Workflow 5: Submit to App Store / Play Store
+
+1. **Generate metadata** -- `python scripts/store_metadata.py --screenshots ./screenshots`
+2. **Build release** -- `python scripts/build.py --platform ios --env production`
+3. **Review** the generated listing (title, description, keywords, screenshots).
+4. **Upload** via Xcode (iOS) or Play Console (Android).
+5. **Validate** -- Monitor review status and address any rejection feedback.
+
+---
+
+## Reference Materials
+
+| Document | Path |
+|----------|------|
+| React Native Guide | [references/react_native_guide.md](references/react_native_guide.md) |
+| iOS Patterns | [references/ios_patterns.md](references/ios_patterns.md) |
+| Android Patterns | [references/android_patterns.md](references/android_patterns.md) |
+| App Store Guide | [references/app_store_guide.md](references/app_store_guide.md) |
+| Full Code Examples | [REFERENCE.md](REFERENCE.md) |
+
+---
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| App crashes on launch after adding a new dependency | Incompatible native module version or missing pod install / gradle sync | Run `npx pod-install` (iOS) or `cd android &amp;&amp; ./gradlew clean` (Android). Verify dependency version compatibility in the changelog. |
+| FlatList renders blank or flickers | Missing `keyExtractor`, unstable keys, or inline `renderItem` causing full re-renders | Add a stable `keyExtractor`, wrap `renderItem` in `useCallback`, and supply `getItemLayout` for fixed-height rows. |
+| iOS build fails with &quot;signing&quot; error | Provisioning profile mismatch or expired certificate | Open Xcode &gt; Signing &amp; Capabilities, select the correct team and profile. Run `security find-identity -v -p codesigning` to verify certificates. |
+| Android build OOM during dexing | Insufficient JVM heap for large projects | Add `org.gradle.jvmargs=-Xmx4096m` to `gradle.properties`. Enable `dexOptions { javaMaxHeapSize &quot;4g&quot; }` in `build.gradle`. |
+| App Store rejection for missing privacy manifest | Apple requires PrivacyInfo.xcprivacy for apps using required reason APIs (UserDefaults, file timestamp, etc.) | Add a `PrivacyInfo.xcprivacy` file declaring each required reason API. Run `store_metadata_generator.py` to review privacy label guidance. |
+| Slow cold start time (&gt;3 seconds) | Too many synchronous operations on the main thread at launch, large bundle size, or unoptimized images | Defer non-critical initialization, lazy-load modules, compress images, and use `app_performance_analyzer.py` to identify bottlenecks. |
+| Hot reload / fast refresh stops working | Syntax error in a module boundary, anonymous default export, or class component state | Check terminal for error messages, ensure named exports, and restart the Metro bundler or Flutter daemon with a cache clear. |
+
+---
+
+## Success Criteria
+
+- **App startup time under 2 seconds** on cold launch (measured on mid-range devices, both iOS and Android).
+- **Crash-free rate above 99.5%** across all supported OS versions, tracked via Crashlytics or Sentry.
+- **Frame rendering at 60 fps** (16ms per frame) for scrolling lists and animations, with zero jank frames during typical user flows.
+- **Bundle size under 50 MB** for the initial download (excluding on-demand resources), verified before each release.
+- **Performance analyzer score of 75+** (Grade B or above) when running `app_performance_analyzer.py` against the project.
+- **Zero critical issues** and fewer than 5 warnings reported by the performance analyzer before submitting to app stores.
+- **App Store / Play Store approval on first submission** with complete metadata, correct privacy labels, and proper age rating, validated using `store_metadata_generator.py`.
+
+---
+
+## Scope &amp; Limitations
+
+**This skill covers:**
+- Scaffolding production-ready mobile projects for React Native (Expo Router), Flutter, iOS native (SwiftUI), and Android native (Jetpack Compose).
+- Static performance analysis including image asset sizing, re-render detection, memory leak patterns, and bundle size estimation.
+- App Store and Play Store metadata generation including titles, keywords, privacy labels, age ratings, and submission checklists.
+- Platform-specific architecture patterns (MVVM, state management, navigation).
+
+**This skill does NOT cover:**
+- Backend API development or server-side logic (see `senior-backend` and `senior-fullstack` skills).
+- CI/CD pipeline configuration for mobile builds and automated distribution (see `senior-devops` and `release-orchestrator` skills).
+- UI/UX design systems, accessibility auditing, or design token management (see `senior-frontend` and `design-auditor` skills).
+- Runtime profiling with native tools (Xcode Instruments, Android Studio Profiler) -- the analyzer performs static code analysis only, not live device profiling.
+
+---
+
+## Integration Points
+
+| Skill | Integration | Data Flow |
+|-------|-------------|-----------|
+| `senior-frontend` | Shared component patterns, styling conventions, and responsive design principles for React Native web targets | Frontend design tokens and component APIs feed into mobile UI components |
+| `senior-backend` | API contract definitions, authentication flows, and data models consumed by mobile clients | Backend OpenAPI specs define mobile service layer interfaces |
+| `senior-devops` | Build pipelines, code signing automation, and deployment workflows for mobile releases | Mobile build artifacts flow into CI/CD pipelines for TestFlight / Play Console distribution |
+| `senior-qa` | Test strategy alignment, device matrix coverage, and E2E testing patterns for mobile screens | QA test plans drive device coverage; mobile scaffold includes test directory structure |
+| `senior-security` | Secure storage patterns (Keychain/Keystore), certificate pinning, and data encryption for mobile apps | Security requirements inform Keychain helper implementation and network client configuration |
+| `release-orchestrator` | Version bumping, changelog generation, and coordinated release across iOS and Android | Release metadata and version info flow from orchestrator into store submission workflow |
+
+---
+
+## Tool Reference
+
+### `mobile_scaffold.py`
+
+**Purpose:** Scaffold a production-ready mobile project with proper directory structure, navigation setup, state management, and base configuration files.
+
+**Usage:**
+```bash
+python scripts/mobile_scaffold.py &lt;name&gt; --platform &lt;platform&gt; [options]
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | positional | Yes | -- | Project name, used as the directory name |
+| `--platform`, `-p` | choice | Yes | -- | Target platform: `android-native`, `flutter`, `ios-native`, `react-native` |
+| `--typescript`, `-t` | flag | No | `False` (auto-enabled for react-native) | Use TypeScript (React Native only) |
+| `--state`, `-s` | string | No | `none` | State management library. React Native: `zustand`, `redux`, `jotai`, `none`. Flutter: `riverpod`, `bloc`, `provider`, `none`. Not applicable for native platforms. |
+| `--output-dir`, `-o` | path | No | `.` (current directory) | Parent directory for the generated project |
+| `--json` | flag | No | `False` | Output result as JSON instead of human-readable summary |
+
+**Example:**
+```bash
+# Scaffold a React Native app with Zustand state management
+python scripts/mobile_scaffold.py MyApp --platform react-native --state zustand
+
+# Scaffold a Flutter app with Riverpod, output as JSON
+python scripts/mobile_scaffold.py my-flutter-app --platform flutter --state riverpod --json
+
+# Scaffold an iOS native app in a specific directory
+python scripts/mobile_scaffold.py HealthTracker --platform ios-native --output-dir ~/Projects
+```
+
+**Output Formats:**
+- **Human-readable (default):** Prints the project name, platform, state management choice, created directory path, and a list of all generated files.
+- **JSON (`--json`):** Returns a JSON object with `project_name`, `platform`, `typescript`, `state_management`, `output_directory`, `files_created`, and `generated_at` fields.
+
+---
+
+### `store_metadata_generator.py`
+
+**Purpose:** Generate structured metadata for App Store (iOS) and Google Play Store (Android) submissions, including title variants, keywords, category recommendations, privacy labels, age rating guidance, and submission checklists.
+
+**Usage:**
+```bash
+python scripts/store_metadata_generator.py --app-name &lt;name&gt; --category &lt;category&gt; --features &lt;features&gt; [options]
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `--app-name` | string | Yes | -- | The app name for store listings |
+| `--category` | choice | Yes | -- | Primary app category. Choices: `business`, `education`, `entertainment`, `finance`, `food`, `games`, `health`, `lifestyle`, `music`, `navigation`, `news`, `photo`, `productivity`, `shopping`, `social`, `sports`, `travel`, `utilities`, `weather` |
+| `--features` | string | Yes | -- | Comma-separated list of features (e.g., `&quot;offline,sync,biometric&quot;`). Recognized features expand into keywords and trigger privacy/age-rating guidance. |
+| `--description` | string | No | `&quot;&quot;` | Short app description used in generated store copy |
+| `--json` | flag | No | `False` | Output results as JSON |
+
+**Example:**
+```bash
+# Generate metadata for a health app
+python scripts/store_metadata_generator.py --app-name &quot;FitTrack&quot; --category health --features &quot;workout,tracking,social&quot; --description &quot;Track your workouts&quot;
+
+# JSON output for CI integration
+python scripts/store_metadata_generator.py --app-name &quot;BudgetPal&quot; --category finance --features &quot;payment,offline,biometric,push&quot; --json
+```
+
+**Output Formats:**
+- **Human-readable (default):** Formatted report with sections for Title Variants, Keywords (with iOS 100-char field), Store Categories, Privacy Labels / Data Safety, Age Rating Guidance, and Submission Checklist.
+- **JSON (`--json`):** Full metadata object including `titles`, `keywords`, `categories`, `descriptions`, `privacy_labels`, `age_rating`, `screenshot_specs`, and `submission_checklist`.
+
+---
+
+### `app_performance_analyzer.py`
+
+**Purpose:** Analyze a mobile project directory for common performance issues including oversized image assets, re-render patterns, memory leak patterns, bundle size estimation, and platform-specific anti-patterns.
+
+**Usage:**
+```bash
+python scripts/app_performance_analyzer.py &lt;project_dir&gt; [options]
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `project_dir` | positional | Yes | -- | Path to the mobile project directory to analyze |
+| `--platform`, `-p` | choice | No | Auto-detected | Target platform: `react-native`, `flutter`, `ios-native`, `android-native`. Auto-detected from project files if omitted. |
+| `--json` | flag | No | `False` | Output results as JSON |
+
+**Example:**
+```bash
+# Analyze with auto-detected platform
+python scripts/app_performance_analyzer.py ./my-app
+
+# Analyze a React Native project explicitly
+python scripts/app_performance_analyzer.py ./my-app --platform react-native
+
+# JSON output for CI pipeline integration
+python scripts/app_performance_analyzer.py ./my-app --platform flutter --json
+```
+
+**Output Formats:**
+- **Human-readable (default):** Performance score (0-100 with letter grade), issue summary (critical/warning/info counts), bundle size estimate, detailed issues grouped by category, and platform-specific recommendations.
+- **JSON (`--json`):** Full report object including `performance_score`, `summary`, `bundle_estimate` (source code size, asset size, file counts), `issues_by_category`, and the flat `issues` array with `category`, `severity`, `file`, `line`, and `message` per issue.
+
+---
+
+## What I Need You to Do
+
+First, detect which platform I&#x27;m using (Claude.ai, ChatGPT, etc.) and follow the matching instructions below.
+
+### If I&#x27;m on Claude.ai:
+
+Walk me through these exact steps:
+
+1. **Create the Project:** Tell me to go to **claude.ai &gt; Projects &gt; Create project** and name it **&quot;Senior Mobile&quot;**
+
+2. **Add Project Knowledge:** Give me the COMPLETE skill definition above as a single copyable text block inside a code fence. Tell me to click **&quot;Add content&quot; &gt; &quot;Add text content&quot;** inside the project, then paste that entire block. Do NOT say &quot;paste from above&quot; -- give me the actual text to copy right there.
+
+3. **Set Custom Instructions:** Tell me to open project settings and paste this exact instruction:
+   &quot;You are an expert Senior Mobile in the Engineering domain. Use the project knowledge as your expertise. Follow the workflows, frameworks, and templates defined there. Always provide specific, actionable output.&quot;
+
+4. **Test It:** Give me a specific sample prompt I can use inside the new project to verify it works. Pick a real task from the skill&#x27;s workflows.
+
+### If I&#x27;m on ChatGPT:
+
+Walk me through these exact steps:
+
+1. **Create a Custom GPT:** Tell me to go to **chatgpt.com &gt; Explore GPTs &gt; Create**
+2. **Configure it:**
+   - Name: **&quot;Senior Mobile&quot;**
+   - Description: &quot;&quot;
+   - Instructions: Give me the COMPLETE skill definition above as a single copyable text block inside a code fence to paste into the Instructions field. Do NOT say &quot;paste from above.&quot;
+3. **Test It:** Give me a sample prompt to verify it works.
+
+### If I&#x27;m on another platform:
+Ask which tool I&#x27;m using and adapt the instructions accordingly.
+
+## Important
+- Always provide the full skill text in a ready-to-copy code block -- never tell me to &quot;scroll up&quot; or &quot;copy from above&quot;
+- Keep the setup steps simple and numbered
+- After setup, test it with me using a real workflow from the skill
+
+Source: https://github.com/borghei/Claude-Skills/tree/main/engineering/senior-mobile/SKILL.md</pre>
+      </details>
+    </div>
+  </div>
+</div>
+<div class="tab-content" id="tab-claude">
+  <pre><code># Add to your project
+cs install engineering/senior-mobile ./
+
+# Or copy directly
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/senior-mobile your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-codex">
+  <pre><code># The skill is available in your Codex workspace at:
+.codex/skills/senior-mobile/
+
+# Reference the SKILL.md in your Codex instructions
+# or copy it into your project:
+cp -r .codex/skills/senior-mobile your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-gemini">
+  <pre><code># The skill is available in your Gemini CLI workspace at:
+.gemini/skills/senior-mobile/
+
+# Reference the SKILL.md in your Gemini instructions
+# or copy it into your project:
+cp -r .gemini/skills/senior-mobile your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-cursor">
+  <pre><code># Add to your .cursorrules or workspace settings:
+# Reference: engineering/senior-mobile/SKILL.md
+
+# Or copy the skill folder into your project:
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/senior-mobile your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-manual">
+  <pre><code># Clone and copy
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/senior-mobile your-project/
+
+# Or download just this skill
+curl -sL https://github.com/borghei/Claude-Skills/archive/main.tar.gz | tar xz --strip=1 Claude-Skills-main/engineering/senior-mobile</code></pre>
+</div>
+<h3>Run Python Tools</h3>
+<pre><code>python engineering/senior-mobile/scripts/tool_name.py --help</code></pre>
+  
+  <h2>Quick Start</h2><pre><code># Scaffold a React Native project
+python scripts/mobile_scaffold.py --platform react-native --name MyApp
+
+# Build for production
+python scripts/build.py --platform ios --env production
+
+# Generate App Store metadata
+python scripts/store_metadata.py --screenshots ./screenshots
+
+# Profile rendering performance
+python scripts/profile.py --platform android --output report.html
+</code></pre>
+
+---
+  <h2>Related Skills in Engineering</h2><div class="related-grid"><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-designer.html" class="skill-card" style="text-decoration:none"><h3>Agent Designer</h3><p>Designs multi-agent system architectures with orchestration patterns, tool schemas, and...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-protocol.html" class="skill-card" style="text-decoration:none"><h3>Agent Protocol</h3><p>Design and implement AI agent communication protocols including MCP tool schemas, Google A2A...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-workflow-designer.html" class="skill-card" style="text-decoration:none"><h3>Agent Workflow Designer</h3><p>Design and implement multi-agent orchestration systems with workflow DAGs, agent routing,...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/api-design-reviewer.html" class="skill-card" style="text-decoration:none"><h3>Api Design Reviewer</h3><p>Reviews REST API designs for quality, consistency, and breaking changes. Lints OpenAPI specs,...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/api-test-suite-builder.html" class="skill-card" style="text-decoration:none"><h3>Api Test Suite Builder</h3><p>Generate comprehensive API test suites from route definitions across frameworks. Covers auth...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/aws-solution-architect.html" class="skill-card" style="text-decoration:none"><h3>Aws Solution Architect</h3><p>Design AWS architectures for startups using serverless patterns and IaC templates. Use when...</p></a></div>
+  <p style="margin-top:32px"><a href="https://github.com/borghei/Claude-Skills/tree/main/engineering/senior-mobile/SKILL.md" target="_blank" rel="noopener" class="btn btn-secondary">View on GitHub <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a></p>
+</article>
+</main>
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-links">
+      <a href="https://github.com/borghei/Claude-Skills" target="_blank" rel="noopener">GitHub</a>
+      <span class="footer-sep">&middot;</span>
+      <span>MIT + Commons Clause</span>
+      <span class="footer-sep">&middot;</span>
+      <a href="https://buymeacoffee.com/borghei" target="_blank" rel="noopener">Buy Me a Coffee</a>
+    </div>
+    <div class="footer-credit">Built by <a href="https://github.com/borghei" target="_blank" rel="noopener">borghei</a></div>
+  </div>
+</footer>
+<script>
+document.querySelectorAll('.tab-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+    document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active')});
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+function copyPrompt(btn){
+  var text=btn.getAttribute('data-prompt');
+  // Decode HTML entities
+  var ta=document.createElement('textarea');
+  ta.innerHTML=text;
+  text=ta.value;
+  navigator.clipboard.writeText(text).then(function(){
+    btn.classList.add('copied');
+    btn.querySelector('span').textContent='Copied!';
+    setTimeout(function(){
+      btn.classList.remove('copied');
+      btn.querySelector('span').textContent='Copy Prompt';
+    },2000);
+  });
+}
+</script>
+</body>
+</html>

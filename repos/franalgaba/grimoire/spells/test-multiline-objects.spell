@@ -1,0 +1,26 @@
+# Test: multi-line object literals in expression context
+# Note: object literals are parsed successfully; downstream IR support depends on venue adapters
+
+spell TestMultilineObjects {
+
+  version: "1.0.0"
+  description: "Object literals can span multiple lines"
+
+  assets: [USDC]
+
+  params: {
+    cfg: {
+      session_id: "test-session-1"
+      v: 1
+      quorum: 1
+    }
+
+  }
+  venues: {
+    uniswap_v3: @uniswap_v3
+  }
+  on manual: {
+    uniswap_v3.swap(USDC, USDC, params.cfg.v)
+    emit done(status=1)
+  }
+}

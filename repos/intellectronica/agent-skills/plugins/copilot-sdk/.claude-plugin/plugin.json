@@ -1,0 +1,12 @@
+{
+  "name": "copilot-sdk",
+  "version": "0.1.1775555186",
+  "description": "This skill helps with GitHub Copilot SDK work across Node.js/TypeScript, Python, Go, .NET, and Java. It covers setup, authentication, permissions, streaming events, custom tools, custom agents, MCP servers, hooks, skills, and session persistence.",
+  "author": {
+    "name": "Eleanor Berger",
+    "url": "https://intellectronica.net"
+  },
+  "repository": "https://github.com/intellectronica/agent-skills",
+  "homepage": "https://github.com/intellectronica/agent-skills/tree/main/plugins/copilot-sdk",
+  "license": "MIT"
+}

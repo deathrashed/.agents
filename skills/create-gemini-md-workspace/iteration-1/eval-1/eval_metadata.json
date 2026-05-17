@@ -1,0 +1,6 @@
+{
+  "eval_id": 1,
+  "eval_name": "claude-code-project",
+  "prompt": "generate gemini.md",
+  "assertions": []
+}

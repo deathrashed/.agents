@@ -1,0 +1,125 @@
+/**
+ * Compiler exports
+ */
+
+export { parseExpression, tryParseExpression } from "./expression-parser.js";
+// Export new Grimoire syntax compiler
+export {
+  compileGrimoire,
+  type ExpressionNode,
+  formatGrimoire,
+  type GrimoireFormatResult,
+  parse as parseGrimoireAST,
+  parseGrimoire,
+  type SectionNode,
+  type SpellAST,
+  type StatementNode,
+  type TriggerHandler,
+  transform as transformGrimoireAST,
+} from "./grimoire/index.js";
+export { generateIR, type IRGeneratorResult } from "./ir-generator.js";
+export { type TypeCheckResult, typeCheckIR } from "./type-checker.js";
+export { type AdvisorySummary, type ValidationResult, validateIR } from "./validator.js";
+
+import { readFile } from "node:fs/promises";
+import type { CompilationResult, SpellSource } from "../types/ir.js";
+import { GrimoireError } from "./grimoire/errors.js";
+import { compileGrimoire, parseGrimoire } from "./grimoire/index.js";
+
+/** Parse result */
+export interface ParseResult {
+  success: boolean;
+  source?: SpellSource;
+  errors: Array<{ code: string; message: string; line?: number; column?: number }>;
+  warnings: Array<{ code: string; message: string; line?: number; column?: number }>;
+}
+
+/**
+ * Parse a .spell file from string content
+ * Uses the new Grimoire syntax parser
+ */
+export function parseSpell(content: string): ParseResult {
+  try {
+    const source = parseGrimoire(content);
+    return {
+      success: true,
+      source,
+      errors: [],
+      warnings: [],
+    };
+  } catch (error) {
+    const err = error as Error;
+    const grimoireError = error instanceof GrimoireError ? error : undefined;
+    return {
+      success: false,
+      errors: [
+        {
+          code: grimoireError?.code ?? "PARSE_ERROR",
+          message: err.message,
+          line: grimoireError?.location?.line,
+          column: grimoireError?.location?.column,
+        },
+      ],
+      warnings: [],
+    };
+  }
+}
+
+/**
+ * Parse a spell file from a file path
+ */
+export async function parseSpellFile(filePath: string): Promise<ParseResult> {
+  try {
+    const content = await readFile(filePath, "utf8");
+    const source = parseGrimoire(content, { filePath });
+    return {
+      success: true,
+      source,
+      errors: [],
+      warnings: [],
+    };
+  } catch (e) {
+    const error = e as Error;
+    return {
+      success: false,
+      errors: [
+        {
+          code: "FILE_READ_ERROR",
+          message: `Failed to read file: ${error.message}`,
+        },
+      ],
+      warnings: [],
+    };
+  }
+}
+
+/**
+ * Compile a .spell file from source string
+ * This is the main entry point for compilation
+ * Uses the new Grimoire syntax
+ */
+export function compile(source: string): CompilationResult {
+  return compileGrimoire(source);
+}
+
+/**
+ * Compile a .spell file from file path
+ */
+export async function compileFile(filePath: string): Promise<CompilationResult> {
+  try {
+    const content = await readFile(filePath, "utf8");
+    return compileGrimoire(content, { filePath });
+  } catch (e) {
+    const error = e as Error;
+    return {
+      success: false,
+      errors: [
+        {
+          code: "FILE_READ_ERROR",
+          message: `Failed to read file: ${error.message}`,
+        },
+      ],
+      warnings: [],
+    };
+  }
+}

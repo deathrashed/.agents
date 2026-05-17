@@ -1,0 +1,771 @@
+use std::{
+    io::{self, BufRead, IsTerminal, Read, Write},
+    net::TcpListener,
+    time::Duration,
+};
+
+pub use error::Error;
+use tracing::warn;
+use turborepo_api_client::{Client, TokenClient};
+use turborepo_ui::{BOLD, ColorConfig, start_spinner};
+use url::Url;
+
+use crate::{
+    LoginOptions, Token,
+    auth::{
+        ExistingTokenSource, classify_existing_vercel_token, ensure_trusted_vercel_api, is_vercel,
+        should_attempt_vercel_token_refresh, should_skip_existing_token_for_login,
+    },
+    device_flow::{self, TokenSet},
+    error, ui,
+};
+
+const DEFAULT_HOST_NAME: &str = "127.0.0.1";
+const DEFAULT_PORT: u16 = 9789;
+const LOGIN_REDIRECT_TIMEOUT: Duration = Duration::from_secs(300);
+
+pub(super) fn is_inactive_token_error(error: &Error) -> bool {
+    matches!(
+        error,
+        Error::APIError(turborepo_api_client::Error::InvalidToken { message, .. })
+            if message == "token is not active"
+    )
+}
+
+pub(super) fn is_auth_rejection_error(error: &Error) -> bool {
+    match error {
+        Error::APIError(turborepo_api_client::Error::InvalidToken { .. })
+        | Error::APIError(turborepo_api_client::Error::ForbiddenToken { .. }) => true,
+        Error::APIError(turborepo_api_client::Error::UnknownStatus { code, .. }) => {
+            code == "forbidden"
+        }
+        Error::APIError(turborepo_api_client::Error::ReqwestError(err))
+        | Error::ReqwestError(err) => err.status() == Some(reqwest::StatusCode::FORBIDDEN),
+        _ => false,
+    }
+}
+
+pub(super) fn valid_token_callback(message: &str, color_config: &ColorConfig) -> impl FnOnce(&str) {
+    let message = message.to_string();
+    let color_config = *color_config;
+    move |user_email: &str| {
+        println!("{}", color_config.apply(BOLD.apply_to(message)));
+        ui::print_cli_authorized(user_email, &color_config);
+    }
+}
+
+async fn reuse_existing_token<T, F>(
+    token: Token,
+    api_client: &T,
+    valid_message_fn: Option<F>,
+) -> Result<Option<Token>, Error>
+where
+    T: Client + TokenClient,
+    F: FnOnce(&str),
+{
+    match token.is_valid(api_client, valid_message_fn).await {
+        Ok(true) => Ok(Some(token)),
+        Ok(false) => Ok(None),
+        Err(err) if is_inactive_token_error(&err) => {
+            warn!("Stored token is no longer active, proceeding with new login");
+            Ok(None)
+        }
+        Err(err) => Err(err),
+    }
+}
+
+async fn reuse_existing_token_with_recovery<T>(
+    token: Token,
+    api_client: &T,
+    valid_message: &str,
+    color_config: &ColorConfig,
+) -> Result<Option<Token>, Error>
+where
+    T: Client + TokenClient,
+{
+    match reuse_existing_token(
+        token.clone(),
+        api_client,
+        Some(valid_token_callback(valid_message, color_config)),
+    )
+    .await
+    {
+        Ok(Some(token)) => return Ok(Some(token)),
+        Ok(None) => {}
+        Err(err) if is_auth_rejection_error(&err) => {}
+        Err(err) => return Err(err),
+    }
+
+    let Some(recovered_token) =
+        crate::auth::recover_token_after_forbidden(token.into_inner()).await?
+    else {
+        return Ok(None);
+    };
+
+    match reuse_existing_token(
+        Token::existing_secret(recovered_token),
+        api_client,
+        Some(valid_token_callback(valid_message, color_config)),
+    )
+    .await
+    {
+        Ok(result) => Ok(result),
+        Err(err) if is_auth_rejection_error(&err) => Ok(None),
+        Err(err) => Err(err),
+    }
+}
+
+/// Login returns a `(Token, Option<TokenSet>)`. If a token is already present,
+/// we do not overwrite it and instead log that we found an existing token.
+///
+/// First checks if an existing option has been passed in, then if the login is
+/// to Vercel, checks if Turbo already has a token on disk.
+///
+/// For Vercel logins, uses the OAuth 2.0 Device Authorization Grant (RFC 8628).
+/// For non-Vercel logins (self-hosted remote caches), opens a browser to the
+/// server's token page and waits for a localhost redirect with the token.
+///
+/// The `TokenSet` is `Some` when login completed via the device authorization
+/// flow (Vercel only). It's `None` for non-Vercel logins or when an existing
+/// token was reused.
+pub async fn login<T: Client + TokenClient>(
+    options: &LoginOptions<'_, T>,
+) -> Result<(Token, Option<TokenSet>), Error> {
+    let LoginOptions {
+        api_client,
+        color_config,
+        login_url: login_url_configuration,
+        existing_token,
+        force,
+        sso_team: _,
+        sso_login_callback_port,
+    } = *options;
+
+    let is_vercel_login = is_vercel(login_url_configuration);
+    if is_vercel_login {
+        ensure_trusted_vercel_api(api_client)?;
+    }
+
+    // Check if passed in token exists first.
+    // For Vercel logins, --force is silently ignored.
+    if !force || is_vercel_login {
+        if let Some(token) = existing_token {
+            let token_source = classify_existing_vercel_token(token)?;
+            let skip_existing_token = should_skip_existing_token_for_login(
+                token_source,
+                is_vercel_login,
+                login_url_configuration,
+            );
+
+            if is_vercel_login && should_attempt_vercel_token_refresh(token_source) {
+                match crate::auth::get_token_with_refresh_for_login().await {
+                    Ok(Some(token_secret)) => {
+                        if classify_existing_vercel_token(token_secret.expose())?
+                            != ExistingTokenSource::LegacyAuth
+                            && let Some(token) = reuse_existing_token_with_recovery(
+                                Token::existing_secret(token_secret),
+                                api_client,
+                                "Using existing Vercel login.",
+                                color_config,
+                            )
+                            .await?
+                        {
+                            return Ok((token, None));
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        warn!("Failed to load existing token, proceeding with new login: {e}");
+                    }
+                }
+            } else if !skip_existing_token && token_source != ExistingTokenSource::LegacyAuth {
+                let token = Token::existing(token.into());
+                let reused_token = if is_vercel_login {
+                    reuse_existing_token_with_recovery(
+                        token,
+                        api_client,
+                        "Using existing Vercel login.",
+                        color_config,
+                    )
+                    .await?
+                } else {
+                    reuse_existing_token(
+                        token,
+                        api_client,
+                        Some(valid_token_callback("Using existing login.", color_config)),
+                    )
+                    .await?
+                };
+
+                if let Some(token) = reused_token {
+                    return Ok((token, None));
+                }
+            }
+        } else if is_vercel_login {
+            match crate::auth::get_token_with_refresh_for_login().await {
+                Ok(Some(token_secret)) => {
+                    if classify_existing_vercel_token(token_secret.expose())?
+                        != ExistingTokenSource::LegacyAuth
+                        && let Some(token) = reuse_existing_token_with_recovery(
+                            Token::existing_secret(token_secret),
+                            api_client,
+                            "Using existing Vercel login.",
+                            color_config,
+                        )
+                        .await?
+                    {
+                        return Ok((token, None));
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    warn!("Failed to load existing token, proceeding with new login: {e}");
+                }
+            }
+        }
+    }
+
+    if is_vercel_login {
+        login_vercel_device_flow(api_client, color_config, login_url_configuration).await
+    } else {
+        let port = sso_login_callback_port.unwrap_or(DEFAULT_PORT);
+        login_redirect(api_client, color_config, login_url_configuration, port).await
+    }
+}
+
+/// Vercel login via OAuth 2.0 Device Authorization Grant (RFC 8628).
+pub(super) async fn login_vercel_device_flow<T: Client>(
+    api_client: &T,
+    color_config: &ColorConfig,
+    login_url: &str,
+) -> Result<(Token, Option<TokenSet>), Error> {
+    let http_client = reqwest::Client::new();
+
+    let metadata = device_flow::discover(&http_client, login_url).await?;
+    let device_auth = device_flow::device_authorization_request(&http_client, &metadata).await?;
+
+    let expires_at = crate::current_unix_time_secs() + device_auth.expires_in;
+
+    let verification_url = device_auth
+        .verification_uri_complete
+        .as_deref()
+        .unwrap_or(&device_auth.verification_uri);
+
+    // RFC 8628 §3.3: the user code MUST be displayed so users can verify
+    // it matches what the authorization server shows (anti-phishing).
+    println!(
+        "\n  Visit {} and confirm code {}",
+        color_config.apply(BOLD.apply_to(&device_auth.verification_uri)),
+        color_config.apply(BOLD.apply_to(&device_auth.user_code))
+    );
+
+    if wait_for_browser_confirmation()? && webbrowser::open(verification_url).is_err() {
+        warn!(
+            "Failed to open browser. Please visit {} in your browser.",
+            device_auth.verification_uri
+        );
+    }
+
+    let spinner = start_spinner("Waiting for authentication...");
+
+    let token_set = device_flow::poll_for_token(
+        &http_client,
+        &metadata,
+        &device_auth.device_code,
+        device_auth.interval,
+        expires_at,
+    )
+    .await?;
+
+    spinner.finish_and_clear();
+
+    let secret_token = turborepo_api_client::SecretString::new(token_set.access_token.clone());
+
+    let user_response = api_client
+        .get_user(&secret_token)
+        .await
+        .map_err(Error::FailedToFetchUser)?;
+
+    ui::print_cli_authorized(&user_response.user.email, color_config);
+
+    Ok((Token::new(token_set.access_token.clone()), Some(token_set)))
+}
+
+fn wait_for_browser_confirmation() -> Result<bool, Error> {
+    if cfg!(test) || !io::stdin().is_terminal() {
+        return Ok(false);
+    }
+
+    print!("  Press Enter to open the browser...");
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+
+    Ok(true)
+}
+
+/// Non-Vercel login via browser redirect to a localhost server.
+/// Preserves the original login flow for self-hosted remote cache servers:
+/// opens `{login_url}/turborepo/token?redirect_uri=http://127.0.0.1:{port}`,
+/// waits for the server to redirect back with a `?token=` query parameter.
+async fn login_redirect<T: Client>(
+    api_client: &T,
+    color_config: &ColorConfig,
+    login_url_configuration: &str,
+    port: u16,
+) -> Result<(Token, Option<TokenSet>), Error> {
+    let listener = TcpListener::bind(format!("{DEFAULT_HOST_NAME}:{port}"))
+        .map_err(error::Error::CallbackListenerFailed)?;
+    let port = listener.local_addr().unwrap().port();
+    let redirect_url = format!("http://{DEFAULT_HOST_NAME}:{port}");
+
+    let mut login_url =
+        Url::parse(login_url_configuration).map_err(|_| error::Error::LoginUrlCannotBeABase {
+            value: login_url_configuration.to_string(),
+        })?;
+
+    let mut success_url = login_url.clone();
+    success_url
+        .path_segments_mut()
+        .map_err(|_| error::Error::LoginUrlCannotBeABase {
+            value: login_url_configuration.to_string(),
+        })?
+        .extend(["turborepo", "success"]);
+
+    login_url
+        .path_segments_mut()
+        .map_err(|_| error::Error::LoginUrlCannotBeABase {
+            value: login_url_configuration.to_string(),
+        })?
+        .extend(["turborepo", "token"]);
+
+    login_url
+        .query_pairs_mut()
+        .append_pair("redirect_uri", &redirect_url);
+
+    println!(">>> Opening browser to {login_url}");
+    let spinner = start_spinner("Waiting for your authorization...");
+
+    let url = login_url.as_str();
+    if !cfg!(test) && webbrowser::open(url).is_err() {
+        warn!("Failed to open browser. Please visit {url} in your browser.");
+    }
+
+    let success_redirect = success_url.to_string();
+    let token_string =
+        tokio::task::spawn_blocking(move || wait_for_login_redirect(listener, &success_redirect))
+            .await
+            .map_err(|_| Error::CallbackTaskFailed)??;
+
+    spinner.finish_and_clear();
+
+    let secret_token = turborepo_api_client::SecretString::new(token_string.clone());
+
+    let user_response = api_client
+        .get_user(&secret_token)
+        .await
+        .map_err(Error::FailedToFetchUser)?;
+
+    ui::print_cli_authorized(&user_response.user.email, color_config);
+
+    Ok((Token::new(token_string), None))
+}
+
+/// Accept HTTP requests on the listener until one carries a `token` query
+/// parameter. Browsers may send preflight, favicon, or other auxiliary
+/// requests before the real redirect arrives — looping prevents those from
+/// consuming the single-shot listener.
+fn wait_for_login_redirect(listener: TcpListener, success_redirect: &str) -> Result<String, Error> {
+    listener
+        .set_nonblocking(false)
+        .map_err(Error::CallbackListenerFailed)?;
+
+    let deadline = std::time::Instant::now() + LOGIN_REDIRECT_TIMEOUT;
+
+    loop {
+        let remaining = deadline
+            .checked_duration_since(std::time::Instant::now())
+            .ok_or(Error::CallbackTimeout)?;
+
+        listener
+            .set_nonblocking(false)
+            .map_err(Error::CallbackListenerFailed)?;
+
+        let (stream, _) = listener.accept().map_err(Error::CallbackListenerFailed)?;
+        stream
+            .set_read_timeout(Some(remaining))
+            .map_err(Error::CallbackListenerFailed)?;
+
+        let mut reader =
+            std::io::BufReader::new(stream.try_clone().map_err(Error::CallbackListenerFailed)?);
+        let mut request_line = String::new();
+        if reader
+            .by_ref()
+            .take(8192)
+            .read_line(&mut request_line)
+            .is_err()
+        {
+            continue;
+        }
+
+        let path = match request_line.split_whitespace().nth(1) {
+            Some(p) => p.to_string(),
+            None => continue,
+        };
+
+        let url = match Url::parse(&format!("http://localhost{path}")) {
+            Ok(u) => u,
+            Err(_) => continue,
+        };
+
+        let params: std::collections::HashMap<String, String> = url
+            .query_pairs()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+
+        if let Some(token) = params.get("token").cloned() {
+            let response = format!(
+                "HTTP/1.1 302 Found\r\nLocation: {success_redirect}\r\nConnection: close\r\n\r\n"
+            );
+            let mut write_stream = stream;
+            if let Err(e) = write_stream.write_all(response.as_bytes()) {
+                warn!("Failed to send redirect to browser: {e}");
+            }
+            return Ok(token);
+        }
+
+        // Not the request we're looking for — send a minimal response and
+        // keep listening.
+        let mut write_stream = stream;
+        let _ = write_stream.write_all(b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{assert_matches, env, time::Duration};
+
+    use reqwest::{RequestBuilder, Response};
+    use tempfile::tempdir;
+    use tokio::sync::Mutex;
+    use turbopath::AbsoluteSystemPathBuf;
+    use turborepo_vercel_api::{
+        Membership, Role, Team, TeamsResponse, User, UserResponse, VerifiedSsoUser,
+    };
+    use turborepo_vercel_api_mock::start_test_server;
+
+    use super::*;
+
+    static ENV_LOCK: Mutex<()> = Mutex::const_new(());
+
+    fn create_mock_config_dir() -> AbsoluteSystemPathBuf {
+        let tmp_dir = tempdir().expect("Failed to create temp dir");
+        AbsoluteSystemPathBuf::try_from(tmp_dir.keep()).expect("Failed to create path")
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    enum MockApiError {
+        #[error("Empty token")]
+        EmptyToken,
+    }
+
+    impl From<MockApiError> for turborepo_api_client::Error {
+        fn from(error: MockApiError) -> Self {
+            match error {
+                MockApiError::EmptyToken => turborepo_api_client::Error::UnknownStatus {
+                    code: "empty token".to_string(),
+                    message: "token is empty".to_string(),
+                    backtrace: std::backtrace::Backtrace::capture(),
+                },
+            }
+        }
+    }
+
+    struct MockApiClient {
+        pub base_url: String,
+    }
+
+    impl MockApiClient {
+        fn new() -> Self {
+            Self::with_base_url("https://vercel.com/api")
+        }
+
+        fn with_base_url(base_url: &str) -> Self {
+            Self {
+                base_url: base_url.to_string(),
+            }
+        }
+    }
+
+    impl Client for MockApiClient {
+        async fn get_user(
+            &self,
+            token: &turborepo_api_client::SecretString,
+        ) -> turborepo_api_client::Result<UserResponse> {
+            if token.expose().is_empty() {
+                return Err(MockApiError::EmptyToken.into());
+            }
+
+            Ok(UserResponse {
+                user: User {
+                    id: "id".to_string(),
+                    username: "username".to_string(),
+                    email: "email".to_string(),
+                    name: None,
+                },
+            })
+        }
+        async fn get_teams(
+            &self,
+            token: &turborepo_api_client::SecretString,
+        ) -> turborepo_api_client::Result<TeamsResponse> {
+            if token.expose().is_empty() {
+                return Err(MockApiError::EmptyToken.into());
+            }
+
+            Ok(TeamsResponse {
+                teams: vec![Team {
+                    id: "id".to_string(),
+                    slug: "something".to_string(),
+                    name: "name".to_string(),
+                    created_at: 0,
+                    created: chrono::Utc::now(),
+                    membership: Membership::new(Role::Member),
+                }],
+            })
+        }
+        async fn get_team(
+            &self,
+            _token: &turborepo_api_client::SecretString,
+            _team_id: &str,
+        ) -> turborepo_api_client::Result<Option<Team>> {
+            unimplemented!("get_team")
+        }
+        fn add_ci_header(_request_builder: RequestBuilder) -> RequestBuilder {
+            unimplemented!("add_ci_header")
+        }
+        async fn verify_sso_token(
+            &self,
+            token: &turborepo_api_client::SecretString,
+            _: &str,
+        ) -> turborepo_api_client::Result<VerifiedSsoUser> {
+            Ok(VerifiedSsoUser {
+                token: token.clone(),
+                team_id: Some("team_id".to_string()),
+            })
+        }
+        async fn handle_403(_response: Response) -> turborepo_api_client::Error {
+            unimplemented!("handle_403")
+        }
+        fn make_url(&self, endpoint: &str) -> turborepo_api_client::Result<url::Url> {
+            let url = format!("{}{}", self.base_url, endpoint);
+            url::Url::parse(&url)
+                .map_err(|err| turborepo_api_client::Error::InvalidUrl { url, err })
+        }
+    }
+
+    impl TokenClient for MockApiClient {
+        async fn get_metadata(
+            &self,
+            token: &turborepo_api_client::SecretString,
+        ) -> turborepo_api_client::Result<turborepo_vercel_api::token::ResponseTokenMetadata>
+        {
+            if token.expose().is_empty() {
+                return Err(MockApiError::EmptyToken.into());
+            }
+
+            if token.expose() == "stale-token" {
+                return Err(turborepo_api_client::Error::InvalidToken {
+                    status: 200,
+                    url: "https://vercel.com/api/login/oauth/token/introspect".to_string(),
+                    message: "token is not active".to_string(),
+                });
+            }
+
+            if token.expose() == "forbidden-token" {
+                return Err(turborepo_api_client::Error::InvalidToken {
+                    status: 403,
+                    url: "https://vercel.com/api/v5/user/tokens/current".to_string(),
+                    message: "Not authorized".to_string(),
+                });
+            }
+
+            Ok(turborepo_vercel_api::token::ResponseTokenMetadata {
+                scopes: vec![turborepo_vercel_api::token::Scope {
+                    scope_type: "user".to_string(),
+                    team_id: None,
+                    expires_at: None,
+                }],
+                active_at: 0,
+                client_id: None,
+            })
+        }
+        async fn delete_token(
+            &self,
+            _token: &turborepo_api_client::SecretString,
+        ) -> turborepo_api_client::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn spawn_login_callback(port: u16, token: &'static str) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            for _ in 0..100 {
+                match std::net::TcpStream::connect(format!("127.0.0.1:{port}")) {
+                    Ok(mut stream) => {
+                        let request =
+                            format!("GET /?token={token} HTTP/1.1\r\nHost: localhost\r\n\r\n");
+                        stream.write_all(request.as_bytes()).unwrap();
+                        return;
+                    }
+                    Err(_) => std::thread::sleep(Duration::from_millis(10)),
+                }
+            }
+
+            panic!("failed to connect to login callback listener");
+        })
+    }
+
+    #[tokio::test]
+    async fn test_login_existing_token() {
+        let port = port_scanner::request_open_port().unwrap();
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+        let api_server = tokio::spawn(start_test_server(port, Some(ready_tx)));
+
+        tokio::time::timeout(Duration::from_secs(5), ready_rx)
+            .await
+            .expect("Test server failed to start")
+            .expect("Server setup failed");
+
+        let color_config = turborepo_ui::ColorConfig::new(false);
+        let url = format!("http://localhost:{port}");
+
+        let api_client = MockApiClient::new();
+
+        let mut options = LoginOptions::new(&color_config, &url, &api_client);
+        options.existing_token = Some(turborepo_vercel_api_mock::EXPECTED_TOKEN);
+
+        let (token, token_set) = login(&options).await.unwrap();
+        assert_matches!(token, Token::Existing(..));
+        assert!(token_set.is_none());
+
+        api_server.abort();
+    }
+
+    #[tokio::test]
+    async fn test_login_stale_existing_token_falls_back_to_redirect() {
+        let color_config = turborepo_ui::ColorConfig::new(false);
+        let api_client = MockApiClient::new();
+        let port = port_scanner::request_open_port().unwrap();
+        let callback = spawn_login_callback(port, "fresh-login-token");
+
+        let options = LoginOptions {
+            color_config: &color_config,
+            login_url: "https://example.com",
+            api_client: &api_client,
+            existing_token: Some("stale-token"),
+            force: false,
+            sso_team: None,
+            sso_login_callback_port: Some(port),
+        };
+
+        let (token, token_set) = login(&options).await.unwrap();
+
+        callback.join().unwrap();
+
+        assert_matches!(token, Token::New(ref token) if token.expose() == "fresh-login-token");
+        assert!(token_set.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_vercel_login_rejects_untrusted_api_url() {
+        let color_config = turborepo_ui::ColorConfig::new(false);
+        let api_client = MockApiClient::with_base_url("https://attacker.test/api");
+        let options = LoginOptions::new(&color_config, "https://vercel.com", &api_client);
+
+        let result = login(&options).await;
+
+        assert_matches!(
+            result,
+            Err(Error::UntrustedVercelApiUrl { ref api_url })
+                if api_url == "https://attacker.test/api"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reuse_existing_token_with_recovery_discards_invalid_token_errors() {
+        let _lock = ENV_LOCK.lock().await;
+        let turbo_config_dir = create_mock_config_dir();
+        let vercel_config_dir = create_mock_config_dir();
+        let color_config = turborepo_ui::ColorConfig::new(false);
+        let api_client = MockApiClient::new();
+
+        unsafe {
+            env::set_var("TURBO_CONFIG_DIR_PATH", turbo_config_dir.as_path());
+            env::set_var("VERCEL_CONFIG_DIR_PATH", vercel_config_dir.as_path());
+        }
+
+        let reused = reuse_existing_token_with_recovery(
+            Token::existing("forbidden-token".to_string()),
+            &api_client,
+            "Using existing Vercel login.",
+            &color_config,
+        )
+        .await
+        .unwrap();
+
+        assert!(reused.is_none());
+
+        unsafe {
+            env::remove_var("TURBO_CONFIG_DIR_PATH");
+            env::remove_var("VERCEL_CONFIG_DIR_PATH");
+        }
+    }
+
+    #[test]
+    fn test_wait_for_browser_confirmation_skips_in_tests() {
+        assert!(!wait_for_browser_confirmation().unwrap());
+    }
+
+    #[test]
+    fn test_wait_for_login_redirect_happy_path() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let handle = std::thread::spawn(move || {
+            let mut stream = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+            let request = "GET /?token=my-login-token HTTP/1.1\r\nHost: localhost\r\n\r\n";
+            stream.write_all(request.as_bytes()).unwrap();
+        });
+
+        let result = wait_for_login_redirect(listener, "https://example.com/turborepo/success");
+        handle.join().unwrap();
+        assert_eq!(result.unwrap(), "my-login-token");
+    }
+
+    #[test]
+    fn test_wait_for_login_redirect_skips_non_token_requests() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let handle = std::thread::spawn(move || {
+            // First: a request without a token (e.g. favicon). Listener should
+            // respond with 204 and keep waiting.
+            let mut stream = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+            let request = "GET /favicon.ico HTTP/1.1\r\nHost: localhost\r\n\r\n";
+            stream.write_all(request.as_bytes()).unwrap();
+            let mut buf = [0u8; 256];
+            let _ = std::io::Read::read(&mut stream, &mut buf);
+
+            // Second: the real callback with a token.
+            let mut stream = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+            let request = "GET /?token=my-login-token HTTP/1.1\r\nHost: localhost\r\n\r\n";
+            stream.write_all(request.as_bytes()).unwrap();
+        });
+
+        let result = wait_for_login_redirect(listener, "https://example.com/turborepo/success");
+        handle.join().unwrap();
+        assert_eq!(result.unwrap(), "my-login-token");
+    }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "mastra-agent-skills",
+  "owner": {
+    "name": "Mastra",
+    "email": "team@mastra.ai"
+  },
+  "metadata": {
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "mastra-skills",
+      "description": "Comprehensive Mastra AI framework skill with progressive disclosure. Teaches documentation lookup (embedded docs from node_modules, remote docs from mastra.ai/llms.txt), project setup, troubleshooting, and migrations. Single skill for all Mastra development.",
+      "skills": ["./skills/mastra"],
+      "source": "./",
+      "strict": false
+    }
+  ]
+}

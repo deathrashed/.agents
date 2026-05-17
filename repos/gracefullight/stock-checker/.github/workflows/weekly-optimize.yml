@@ -1,0 +1,39 @@
+name: Weekly Stock Prediction Optimization
+
+on:
+  schedule:
+    - cron: "0 2 * * 0" # Every Sunday at 2 AM UTC
+  workflow_dispatch:
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Run optimization
+        run: bun src/index.ts optimize --trials 50
+
+      - name: Upload results as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optimization-results
+          path: |
+            data/config/
+            src/constants.ts
+          retention-days: 30
+
+      - name: Commit optimized weights
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "feat: update optimized hyperparameters and calibration"
+          file_pattern: |
+            data/config/optimized_weights.json
+            src/constants.ts

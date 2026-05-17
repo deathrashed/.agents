@@ -1,0 +1,1147 @@
+/**
+ * Transformer tests
+ */
+
+import { describe, expect, test } from "bun:test";
+import { parse } from "./parser.js";
+import { transform } from "./transformer.js";
+
+type StepRecord = Record<string, unknown>;
+
+const findStep = (steps: StepRecord[] | undefined, key: string): StepRecord | undefined =>
+  steps?.find((step) => key in step);
+
+const getAction = (step: StepRecord | undefined): StepRecord | undefined =>
+  step && "action" in step ? (step.action as StepRecord) : undefined;
+
+const getCompute = (step: StepRecord | undefined): Record<string, string> | undefined =>
+  step && "compute" in step ? (step.compute as Record<string, string>) : undefined;
+
+const getEmit = (step: StepRecord | undefined): { event?: string } | undefined =>
+  step && "emit" in step ? (step.emit as { event?: string }) : undefined;
+
+describe("Transformer", () => {
+  describe("basic transformation", () => {
+    test("transforms spell name", () => {
+      const source = `spell TestSpell {
+  version: "1.0.0"
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.spell).toBe("TestSpell");
+    });
+
+    test("transforms version", () => {
+      const source = `spell Test {
+  version: "2.0.0"
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.version).toBe("2.0.0");
+    });
+
+    test("transforms description", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+  description: "A test spell"
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.description).toBe("A test spell");
+    });
+  });
+
+  describe("assets transformation", () => {
+    test("transforms asset array", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+  assets: [USDC, DAI, USDT]
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const assets = result.assets ?? {};
+      expect(Object.keys(assets)).toEqual(["USDC", "DAI", "USDT"]);
+    });
+
+    test("assets have default chain", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+  assets: [USDC]
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.assets?.USDC.chain).toBe(1);
+    });
+  });
+
+  describe("params transformation", () => {
+    test("transforms simple params", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  params: {
+    amount: 100
+    threshold: 50
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.params).toBeDefined();
+      expect(result.params?.amount).toBe(100);
+      expect(result.params?.threshold).toBe(50);
+    });
+
+    test("transforms percentage params", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  params: {
+    ratio: 50%
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.params?.ratio).toBe(0.5);
+    });
+
+    test("transforms unit literal params with asset decimals", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+  assets: {
+    USDC: {
+      decimals: 6
+    }
+  }
+
+  params: {
+    amount: 1.5 USDC
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.params?.amount).toBe(1500000);
+    });
+  });
+
+  describe("limits transformation", () => {
+    test("transforms limits as params with prefix", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  limits: {
+    max_allocation: 50%
+    min_amount: 100
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.params?.limit_max_allocation).toBe(0.5);
+      expect(result.params?.limit_min_amount).toBe(100);
+    });
+
+    test("preserves limits when params section appears after limits", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  limits: {
+    max_single_move: 2000
+    approval_required_above: 500
+  }
+
+  params: {
+    amount: 1000
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.params?.limit_max_single_move).toBe(2000);
+      expect(result.params?.limit_approval_required_above).toBe(500);
+      expect(result.params?.amount).toBe(1000);
+    });
+  });
+
+  describe("venues transformation", () => {
+    test("transforms single venue", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  venues: {
+    swap: @uniswap
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.venues).toBeDefined();
+      expect(result.venues?.uniswap).toBeDefined();
+      expect(result.venues?.uniswap.label).toBe("swap");
+    });
+
+    test("transforms venue array", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  venues: {
+    lending: [@aave, @morpho, @compound]
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.venues?.aave).toBeDefined();
+      expect(result.venues?.morpho).toBeDefined();
+      expect(result.venues?.compound).toBeDefined();
+      expect(result.venues?.aave.label).toBe("lending");
+    });
+  });
+
+  describe("state transformation", () => {
+    test("transforms persistent state", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  state: {
+    persistent: {
+      counter: 0
+      total: 100
+    }
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.state).toBeDefined();
+      expect(result.state?.persistent?.counter).toBe(0);
+      expect(result.state?.persistent?.total).toBe(100);
+    });
+
+    test("transforms ephemeral state", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  state: {
+    ephemeral: {
+      temp: 0
+    }
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.state?.ephemeral?.temp).toBe(0);
+    });
+  });
+
+  describe("trigger transformation", () => {
+    test("transforms manual trigger", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.trigger).toEqual({ manual: true });
+    });
+
+    test("transforms hourly trigger", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on hourly: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.trigger).toEqual({ schedule: "0 * * * *" });
+    });
+
+    test("transforms daily trigger", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on daily: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.trigger).toEqual({ schedule: "0 0 * * *" });
+    });
+
+    test("transforms condition trigger", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on condition params.amount > 1 every 60: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.trigger).toEqual({
+        condition: "(params.amount > 1)",
+        poll_interval: 60,
+      });
+    });
+
+    test("transforms event trigger", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on event "base.block" where block.number > 0: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.trigger).toEqual({
+        event: "base.block",
+        filter: "(block.number > 0)",
+      });
+    });
+  });
+
+  describe("statement transformation", () => {
+    test("transforms assignment to compute step", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = 42
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.steps).toBeDefined();
+      expect(result.steps?.length).toBeGreaterThan(0);
+      expect(result.steps?.[0]?.compute).toBeDefined();
+    });
+
+    test("transforms if statement to conditional", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    if x > 10 {
+      y = 1
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const condStep = findStep(result.steps, "if");
+      expect(condStep).toBeDefined();
+    });
+
+    test("transforms for loop", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    for item in items {
+      x = item
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const loopStep = findStep(result.steps, "for");
+      expect(loopStep).toBeDefined();
+    });
+
+    test("transforms emit statement", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    emit done(value=42)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const emitStep = findStep(result.steps, "emit");
+      expect(emitStep).toBeDefined();
+      const emit = getEmit(emitStep);
+      expect(emit?.event).toBe("done");
+    });
+
+    test("transforms halt statement", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    halt "stopped"
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const haltStep = findStep(result.steps, "halt");
+      expect(haltStep).toBeDefined();
+      expect(haltStep?.halt).toBe("stopped");
+    });
+
+    test("transforms wait statement", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    wait 60
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const waitStep = findStep(result.steps, "wait");
+      expect(waitStep).toBeDefined();
+      expect(waitStep?.wait).toBe(60);
+    });
+
+    test("transforms atomic block", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    atomic {
+      x = 1
+      y = 2
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const tryStep = findStep(result.steps, "try");
+      expect(tryStep).toBeDefined();
+    });
+  });
+
+  describe("expression transformation", () => {
+    test("transforms literal expressions", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = 42
+    y = "hello"
+    z = true
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.steps?.length).toBe(3);
+    });
+
+    test("transforms binary expressions", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = a + b * c
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const step = result.steps?.[0];
+      const compute = getCompute(step);
+      expect(compute?.x).toContain("+");
+    });
+
+    test("transforms function calls", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = max(a, b)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const step = result.steps?.[0];
+      const compute = getCompute(step);
+      expect(compute?.x).toContain("max");
+    });
+
+    test("transforms property access", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = params.amount
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const step = result.steps?.[0];
+      const compute = getCompute(step);
+      expect(compute?.x).toContain("params.amount");
+    });
+
+    test("transforms array literal", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = [1, 2, 3]
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const step = result.steps?.[0];
+      const compute = getCompute(step);
+      expect(compute?.x).toContain("[");
+    });
+
+    test("transforms venue reference", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = @aave_v3
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const step = result.steps?.[0];
+      const compute = getCompute(step);
+      expect(compute?.x).toContain("@aave_v3");
+    });
+
+    test("transforms percentage", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = 50%
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const step = result.steps?.[0];
+      const compute = getCompute(step);
+      expect(compute?.x).toBe("0.5");
+    });
+
+    test("transforms unary expressions", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = -a
+    y = not b
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.steps?.length).toBe(2);
+    });
+
+    test("transforms ternary expressions", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = a > 0 ? a : 0
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const step = result.steps?.[0];
+      const compute = getCompute(step);
+      expect(compute?.x).toContain("?");
+    });
+  });
+
+  describe("advisory transformation", () => {
+    test("inline advisory if condition is rejected", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    if **is this safe** {
+      x = 1
+    } else {
+      x = 0
+    }
+  }
+}`;
+      // Inline advisory expressions are no longer supported.
+      expect(() => parse(source)).toThrow(
+        "Inline advisory expressions (**...**) are no longer supported"
+      );
+    });
+
+    test("transforms advisory contract fields on advise statements", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  advisors: {
+    risk: {
+      model: sonnet
+    }
+  }
+
+  on manual: {
+    decision = advise risk: "Check risk" {
+      context: balance, rates
+      within: constraints
+      output: boolean
+      on_violation: clamp
+      clamp_constraints: [max_slippage, min_output]
+      timeout: 10
+      fallback: true
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const step = result.steps?.[0];
+      const advisory = (step?.advisory as Record<string, unknown>) ?? {};
+      expect(advisory.context).toEqual({
+        balance: "balance",
+        rates: "rates",
+      });
+      expect(advisory.within).toBe("constraints");
+      expect(advisory.on_violation).toBe("clamp");
+      expect(advisory.clamp_constraints).toEqual(["max_slippage", "min_output"]);
+      expect(advisory.on_violation_explicit).toBe(true);
+    });
+  });
+
+  describe("method call transformation", () => {
+    test("transforms deposit method call", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    aave.deposit(USDC, 100)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      expect(getAction(actionStep)?.type).toBe("lend");
+    });
+
+    test("transforms lend method call", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    aave.lend(USDC, 100)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      expect(getAction(actionStep)?.type).toBe("lend");
+    });
+
+    test("transforms withdraw method call", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    aave.withdraw(USDC, 100)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      expect(getAction(actionStep)?.type).toBe("withdraw");
+    });
+
+    test("transforms Morpho collateral method calls", () => {
+      const supplySource = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    morpho_blue.supply_collateral(WETH, 100, "weth-usdc-86")
+  }
+}`;
+      const supplyAst = parse(supplySource);
+      const supplyResult = transform(supplyAst);
+      const supplyActionStep = findStep(supplyResult.steps, "action");
+      expect(supplyActionStep).toBeDefined();
+      expect(getAction(supplyActionStep)?.type).toBe("supply_collateral");
+      expect(getAction(supplyActionStep)?.asset).toBe("WETH");
+      expect(getAction(supplyActionStep)?.market_id).toBe("weth-usdc-86");
+
+      const withdrawSource = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    morpho_blue.withdraw_collateral(WETH, 50)
+  }
+}`;
+      const withdrawAst = parse(withdrawSource);
+      const withdrawResult = transform(withdrawAst);
+      const withdrawActionStep = findStep(withdrawResult.steps, "action");
+      expect(withdrawActionStep).toBeDefined();
+      expect(getAction(withdrawActionStep)?.type).toBe("withdraw_collateral");
+      expect(getAction(withdrawActionStep)?.asset).toBe("WETH");
+    });
+
+    test("binds optional market_id for lend/withdraw/repay and borrow", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    morpho_blue.lend(USDC, 100, "market-a")
+    morpho_blue.withdraw(USDC, 100, "market-b")
+    morpho_blue.repay(USDC, 100, "market-c")
+    morpho_blue.borrow(USDC, 100, WETH, "market-d")
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actions = result.steps?.map((step) => getAction(step)).filter(Boolean) ?? [];
+
+      expect(actions[0]?.type).toBe("lend");
+      expect(actions[0]?.market_id).toBe("market-a");
+      expect(actions[1]?.type).toBe("withdraw");
+      expect(actions[1]?.market_id).toBe("market-b");
+      expect(actions[2]?.type).toBe("repay");
+      expect(actions[2]?.market_id).toBe("market-c");
+      expect(actions[3]?.type).toBe("borrow");
+      expect(actions[3]?.collateral).toBe("WETH");
+      expect(actions[3]?.market_id).toBe("market-d");
+    });
+
+    test("maps with(market_id=...) to action.market_id", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    morpho_blue.borrow(USDC, 100) with (
+      market_id="market-x",
+    )
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      expect(getAction(actionStep)?.type).toBe("borrow");
+      expect(getAction(actionStep)?.market_id).toBe("market-x");
+    });
+
+    test("transforms swap method call", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    uniswap.swap(USDC, ETH, 100)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      expect(getAction(actionStep)?.type).toBe("swap");
+    });
+
+    test("maps typed Pendle method calls to typed actions", () => {
+      const cases = [
+        { method: "add_liquidity", args: "USDC, 100, LP" },
+        { method: "add_liquidity_dual", args: "inputs, outputs, true" },
+        { method: "remove_liquidity", args: "LP, 100, USDC" },
+        { method: "remove_liquidity_dual", args: "inputs, outputs" },
+        { method: "mint_py", args: "USDC, 100, PT" },
+        { method: "redeem_py", args: "PT, 100, USDC" },
+        { method: "mint_sy", args: "USDC, 100, SY" },
+        { method: "redeem_sy", args: "SY, 100, USDC" },
+        { method: "transfer_liquidity", args: "inputs, outputs, true" },
+        { method: "roll_over_pt", args: "PT, 100, PT2" },
+        { method: "exit_market", args: "inputs, outputs" },
+        { method: "convert_lp_to_pt", args: "LP, 100, PT" },
+        { method: "pendle_swap", args: "inputs, outputs" },
+      ];
+
+      for (const testCase of cases) {
+        const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    pendle.${testCase.method}(${testCase.args})
+  }
+}`;
+        const ast = parse(source);
+        const result = transform(ast);
+        const actionStep = findStep(result.steps, "action");
+        expect(actionStep).toBeDefined();
+        expect(getAction(actionStep)?.type).toBe(testCase.method);
+      }
+    });
+
+    test("transforms generic method call", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    venue.custom_action(arg1, arg2)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      const action = actionStep?.action as
+        | { type?: string; op?: string; args?: Record<string, unknown> }
+        | undefined;
+      expect(action?.type).toBe("custom");
+      expect(action?.op).toBe("custom_action");
+      expect(action?.args).toEqual({
+        arg0: "arg1",
+        arg1: "arg2",
+      });
+    });
+
+    test("transforms order custom call to typed args", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    hyperliquid.order(BTC, 100000, 1, "buy", false)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      const action = actionStep?.action as
+        | { type?: string; op?: string; args?: Record<string, unknown> }
+        | undefined;
+      expect(action?.type).toBe("custom");
+      expect(action?.op).toBe("order");
+      expect(action?.args).toEqual({
+        coin: "BTC",
+        price: 100000,
+        size: 1,
+        side: "buy",
+        reduce_only: false,
+      });
+    });
+
+    test("transforms convert custom call to named args", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    pendle.convert("0x1,0x2", "10,20", "0x3", "0x4", true, [kyberswap], false, false, "impliedApy", true)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      const action = actionStep?.action as
+        | { type?: string; op?: string; args?: Record<string, unknown> }
+        | undefined;
+      expect(action?.type).toBe("custom");
+      expect(action?.op).toBe("convert");
+      expect(action?.args).toEqual({
+        tokens_in: "0x1,0x2",
+        amounts_in: "10,20",
+        tokens_out: "0x3",
+        receiver: "0x4",
+        enable_aggregator: true,
+        aggregators: ["kyberswap"],
+        redeem_rewards: false,
+        need_scale: false,
+        additional_data: "impliedApy",
+        use_limit_order: true,
+      });
+    });
+
+    test("transforms query method call to compute", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    lending.get_rates(USDC)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const computeStep = findStep(result.steps, "compute");
+      expect(computeStep).toBeDefined();
+    });
+
+    test("extracts venue from identifier", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    myVenue.deposit(USDC, 100)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(getAction(actionStep)?.venue).toBe("myVenue");
+    });
+  });
+
+  describe("complex transformations", () => {
+    test("transforms nested if statements", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    if a > 0 {
+      if b > 0 {
+        x = 1
+      }
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.steps?.length).toBeGreaterThan(0);
+    });
+
+    test("transforms if-elif-else", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    if a > 10 {
+      x = 3
+    } elif a > 5 {
+      x = 2
+    } else {
+      x = 1
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.steps?.length).toBeGreaterThan(0);
+    });
+
+    test("transforms multiple triggers", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    x = 1
+  }
+
+  on hourly: {
+    y = 2
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.trigger).toBeDefined();
+    });
+  });
+
+  describe("guards transformation", () => {
+    test("transforms guards section into source.guards", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  guards: {
+    max_amount: params.amount < 1000000
+    positive: params.amount > 0
+  }
+
+  on manual: {
+    pass
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      expect(result.guards).toBeDefined();
+      expect(result.guards?.length).toBe(2);
+      expect(result.guards?.[0]?.id).toBe("max_amount");
+      expect(result.guards?.[0]?.check).toContain("params.amount");
+      expect(result.guards?.[0]?.severity).toBe("halt");
+      expect(result.guards?.[1]?.id).toBe("positive");
+    });
+  });
+
+  describe("output binding transformation", () => {
+    test("transforms assignment with method call to action step with output", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    result = venue.swap(USDC, ETH, 100)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      expect(actionStep?.output).toBe("result");
+      expect(getAction(actionStep)?.type).toBe("swap");
+    });
+
+    test("plain function call assignment stays as compute step", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    result = max(a, b)
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const computeStep = findStep(result.steps, "compute");
+      expect(computeStep).toBeDefined();
+      expect(getCompute(computeStep)?.result).toContain("max");
+    });
+  });
+
+  describe("constraints transformation", () => {
+    test("transforms with clause on method call to step.constraints", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    venue.swap(USDC, ETH, 1000) with slippage=50, deadline=300, min_output=900, max_input=1100
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      const constraints = actionStep?.constraints as Record<string, unknown> | undefined;
+      expect(constraints).toBeDefined();
+      expect(constraints?.max_slippage).toBe(50);
+      expect(constraints?.deadline).toBe(300);
+      expect(constraints?.min_output).toBe(900);
+      expect(constraints?.max_input).toBe(1100);
+    });
+
+    test("transforms with clause on assignment with method call", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    result = venue.swap(USDC, ETH, 1000) with slippage=50
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const actionStep = findStep(result.steps, "action");
+      expect(actionStep).toBeDefined();
+      expect(actionStep?.output).toBe("result");
+      const constraints = actionStep?.constraints as Record<string, unknown> | undefined;
+      expect(constraints?.max_slippage).toBe(50);
+    });
+  });
+
+  describe("atomic onFailure transformation", () => {
+    test("transforms atomic skip: to try step with skip catch action", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    atomic skip {
+      x = 1
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const tryStep = findStep(result.steps, "try");
+      expect(tryStep).toBeDefined();
+      const catchBlocks = tryStep?.catch as Array<{ error: string; action: string }> | undefined;
+      expect(catchBlocks?.[0]?.action).toBe("skip");
+    });
+
+    test("transforms atomic halt: to try step with halt catch action", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    atomic halt {
+      x = 1
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const tryStep = findStep(result.steps, "try");
+      expect(tryStep).toBeDefined();
+      const catchBlocks = tryStep?.catch as Array<{ error: string; action: string }> | undefined;
+      expect(catchBlocks?.[0]?.action).toBe("halt");
+    });
+
+    test("transforms plain atomic: to try step with revert (default)", () => {
+      const source = `spell Test {
+  version: "1.0.0"
+
+  on manual: {
+    atomic {
+      x = 1
+    }
+  }
+}`;
+      const ast = parse(source);
+      const result = transform(ast);
+      const tryStep = findStep(result.steps, "try");
+      expect(tryStep).toBeDefined();
+      const catchBlocks = tryStep?.catch as Array<{ error: string; action: string }> | undefined;
+      expect(catchBlocks?.[0]?.action).toBe("revert");
+    });
+  });
+});

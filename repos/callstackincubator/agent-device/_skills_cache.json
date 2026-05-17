@@ -1,0 +1,26 @@
+[
+  {
+    "id": "callstackincubator/agent-device/agent-device",
+    "name": "agent-device",
+    "description": "Automates Apple-platform apps (iOS, tvOS, macOS) and Android devices. Use when navigating apps, taking snapshots/screenshots, tapping, typing, scrolling, extracting UI info, collecting logs/network/perf evidence, or planning agent-device CLI commands.",
+    "owner": "callstackincubator",
+    "repo": "agent-device",
+    "skillsPath": "skills",
+    "path": "agent-device",
+    "content": "---\nname: agent-device\ndescription: Automates Apple-platform apps (iOS, tvOS, macOS) and Android devices. Use when navigating apps, taking snapshots/screenshots, tapping, typing, scrolling, extracting UI info, collecting logs/network/perf evidence, or planning agent-device CLI commands.\n---\n\n# agent-device\n\nRouter only. Private setup before using this skill:\n\n```bash\nagent-device --version\n```\n\nIf that fails but the user may have installed `agent-device` globally, check the user's configured login/interactive shell and environment before using `npx`. Resolve the command the same way the user would from a normal terminal session, then run the absolute binary path if found. This may require inspecting shell startup behavior or package-manager/global bin locations; do not assume the Codex process `PATH` is the user's `PATH`.\n\nRequire `agent-device >= 0.14.0`; older CLIs lack these help topics. If older, stop and tell the user to upgrade the trusted install or approve an exact-version npm command. Do not run `npm install -g agent-device@latest` or `npx -y agent-device@latest` autonomously, and do not include version/upgrade commands in final plans.\n\nBefore your first agent-device command or plan, read the version-matched CLI guide:\n\n```bash\nagent-device help workflow\n```\n\nEscalate only when relevant:\n\n```bash\nagent-device help debugging\nagent-device help react-native\nagent-device help react-devtools\nagent-device help remote\nagent-device help macos\nagent-device help dogfood\n```\n\nDefault loop: `open -> snapshot/-i -> get/is/find or press/fill/scroll/wait -> verify -> close`.\n\nUse this skill only to route into version-matched CLI help. Let `help workflow` provide exact command shapes, platform limits, and current workflow guidance.\n\nFor precise location workflows, read the installed `settings` help before planning so coordinate support and platform limits come from the active CLI version.\n",
+    "isInstalled": false,
+    "isFetched": true
+  },
+  {
+    "id": "callstackincubator/agent-device/dogfood",
+    "name": "dogfood",
+    "description": "Systematically explore and test a mobile app on iOS/Android with agent-device to find bugs, UX issues, and other problems. Use when asked to dogfood, QA, exploratory test, find issues, bug hunt, or test this app on mobile.",
+    "owner": "callstackincubator",
+    "repo": "agent-device",
+    "skillsPath": "skills",
+    "path": "dogfood",
+    "content": "---\nname: dogfood\ndescription: Systematically explore and test a mobile app on iOS/Android with agent-device to find bugs, UX issues, and other problems. Use when asked to dogfood, QA, exploratory test, find issues, bug hunt, or test this app on mobile.\nallowed-tools: Bash(agent-device:*), Bash(npx agent-device:*)\n---\n\n# Dogfood\n\nRouter for exploratory QA. Private setup before using this skill:\n\n```bash\nagent-device --version\n```\n\nIf that fails, stop and tell the user to expose a trusted `agent-device` binary on PATH or approve an exact-version npm command. This skill intentionally keeps allowed tools restricted to `agent-device` and `npx agent-device`.\n\nRequire `agent-device >= 0.14.0`; older CLIs lack these help topics. If older, stop and tell the user to upgrade the trusted install or approve an exact-version npm command. Do not run `npm install -g agent-device@latest` or `npx -y agent-device@latest` autonomously, and do not include version/upgrade commands in final plans.\n\nRead current CLI guidance:\n\n```bash\nagent-device help dogfood\n```\n\nLoop: open named session -> snapshot -i + screenshot -> explore flows -> capture evidence per issue -> close.\n\nTarget app is required; infer platform or ask. Findings must come from runtime behavior, not source reads. Let `help dogfood` provide exact report shape, evidence commands, and current workflow guidance.\n",
+    "isInstalled": false,
+    "isFetched": true
+  }
+]

@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self Improving Agent - Claude Skills</title>
+  <meta name="description" content="Patterns for building AI agents that learn from their own execution, detect failure modes, and improve autonomously. Covers feedback loops, performance regression detection, memory curation, skill ext">
+  <link rel="canonical" href="https://borghei.github.io/Claude-Skills/skills/engineering/self-improving-agent.html">
+  <meta property="og:title" content="Self Improving Agent - Claude Skills">
+  <meta property="og:description" content="Patterns for building AI agents that learn from their own execution, detect failure modes, and improve autonomously. Covers feedback loops, performance regression detection, memory curation, skill ext">
+  <meta property="og:url" content="https://borghei.github.io/Claude-Skills/skills/engineering/self-improving-agent.html">
+  <meta property="og:type" content="website">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Self Improving Agent", "description": "Patterns for building AI agents that learn from their own execution, detect failure modes, and improve autonomously. Covers feedback loops, performance regression detection, memory curation, skill ext...", "applicationCategory": "Engineering", "operatingSystem": "Any", "url": "https://borghei.github.io/Claude-Skills/skills/engineering/self-improving-agent.html", "author": {"@type": "Person", "name": "borghei"}, "license": "https://opensource.org/licenses/MIT"}</script>
+  <style>
+:root {
+  --bg: #faf9f5;
+  --bg-secondary: #f0eee6;
+  --text: #141413;
+  --text-muted: #5e5d59;
+  --accent: #d97757;
+  --accent-deep: #c6613f;
+  --border: rgba(20,20,19,0.1);
+  --border-strong: rgba(20,20,19,0.18);
+  --white: #ffffff;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, monospace;
+  --max-width: 1200px;
+  --shadow-sm: 0 1px 2px rgba(20,20,19,0.04);
+  --shadow: 0 1px 3px rgba(20,20,19,0.06), 0 1px 2px rgba(20,20,19,0.04);
+  --shadow-md: 0 4px 12px rgba(20,20,19,0.08), 0 1px 3px rgba(20,20,19,0.06);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+a:hover { color: var(--accent-deep); }
+.container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+code { font-family: var(--font-mono); font-size: 0.875em; }
+
+/* Navbar */
+.navbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(250,249,245,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.navbar .container { display: flex; align-items: center; justify-content: space-between; }
+.nav-logo {
+  font-family: var(--font-serif); font-weight: 700; font-size: 1.1rem;
+  color: var(--text); letter-spacing: -0.01em;
+}
+.nav-logo:hover { color: var(--text); }
+.nav-links { display: flex; gap: 28px; align-items: center; }
+.nav-links a {
+  color: var(--text-muted); font-size: 0.9rem; font-weight: 500;
+  transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-links a.active { color: var(--accent); }
+.nav-links a.gh-link { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Breadcrumbs */
+.breadcrumbs { padding: 20px 0 0; font-size: 0.85rem; color: var(--text-muted); }
+.breadcrumbs a { color: var(--text-muted); }
+.breadcrumbs a:hover { color: var(--accent); }
+.breadcrumbs .sep { margin: 0 8px; opacity: 0.4; }
+
+/* Page header */
+.page-header { padding: 48px 0 32px; }
+.page-title {
+  font-family: var(--font-serif); font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 700; margin-bottom: 12px; letter-spacing: -0.02em;
+  color: var(--text);
+}
+.page-subtitle { color: var(--text-muted); max-width: 700px; font-size: 1.05rem; line-height: 1.6; }
+
+/* Count badge (inline with title) */
+.count-badge {
+  display: inline-block; font-family: var(--font-mono); font-size: 0.8rem;
+  color: var(--accent); background: rgba(217,119,87,0.08);
+  padding: 2px 10px; border-radius: 20px; margin-left: 8px;
+  vertical-align: middle; font-weight: 500;
+}
+
+/* Search + Filter */
+.filter-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+.search-input {
+  flex: 1; min-width: 200px; padding: 10px 14px 10px 38px;
+  background: var(--white); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); color: var(--text); font-family: var(--font-sans);
+  font-size: 0.9rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.1); }
+.search-input::placeholder { color: var(--text-muted); }
+.search-wrap { position: relative; flex: 1; min-width: 200px; }
+.search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.filter-select {
+  padding: 10px 14px; background: var(--white); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); color: var(--text); font-family: var(--font-sans);
+  font-size: 0.9rem; outline: none; cursor: pointer;
+}
+.filter-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.1); }
+
+/* Card grid */
+.skills-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-bottom: 60px; }
+.skill-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  display: flex; flex-direction: column;
+}
+.skill-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.skill-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; }
+.skill-card h3 a { color: var(--text); }
+.skill-card h3 a:hover { color: var(--accent); }
+.skill-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; flex: 1; }
+
+/* Badges */
+.badge-bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 6px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 0.7rem; padding: 3px 9px;
+  border-radius: 5px; font-weight: 500; white-space: nowrap;
+}
+.badge-domain { background: rgba(217,119,87,0.1); border: 1px solid rgba(217,119,87,0.2); color: var(--accent-deep); }
+.badge-subdomain { background: rgba(20,20,19,0.04); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-version { background: rgba(20,20,19,0.03); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-tools { background: rgba(20,20,19,0.04); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-refs { background: rgba(217,119,87,0.06); border: 1px solid rgba(217,119,87,0.15); color: var(--accent); }
+
+/* Tags */
+.skill-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tag {
+  font-family: var(--font-mono); font-size: 0.65rem; padding: 2px 8px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text-muted);
+}
+
+/* Example pills on domain summary cards */
+.example-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.example-pill {
+  font-family: var(--font-mono); font-size: 0.65rem; padding: 2px 7px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text-muted);
+}
+
+/* Skill detail page */
+.skill-detail { padding-bottom: 80px; }
+.skill-detail h2 {
+  font-family: var(--font-serif); font-size: 1.4rem; font-weight: 700;
+  margin: 40px 0 16px; padding-top: 16px;
+  border-top: 1px solid var(--border); color: var(--text);
+}
+.skill-detail h3 { font-size: 1.05rem; font-weight: 600; margin: 20px 0 10px; }
+.skill-detail p, .skill-detail li { font-size: 0.95rem; color: var(--text-muted); line-height: 1.7; }
+.skill-detail ul, .skill-detail ol { margin-left: 20px; margin-bottom: 16px; }
+.skill-detail li { margin-bottom: 6px; }
+.skill-detail pre {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; overflow-x: auto;
+  font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.7;
+  color: var(--text); margin: 12px 0 20px;
+}
+.skill-detail code {
+  font-family: var(--font-mono); font-size: 0.85rem;
+  background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px;
+}
+.skill-detail pre code { background: none; padding: 0; }
+
+/* Platform tabs */
+.platform-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+.tab-btn {
+  padding: 10px 18px; font-size: 0.85rem; font-weight: 500;
+  font-family: var(--font-sans); background: none; border: none;
+  border-bottom: 2px solid transparent; color: var(--text-muted);
+  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.tab-content pre {
+  border-top: none; border-radius: 0 0 var(--radius) var(--radius);
+  margin-top: 0;
+}
+
+/* Quick Start prompt cards */
+.prompt-cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  padding: 20px; background: var(--bg-secondary);
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+@media (max-width: 640px) { .prompt-cards { grid-template-columns: 1fr; } }
+.prompt-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.prompt-card-featured { border-color: var(--accent); border-width: 2px; }
+.prompt-card-header { display: flex; align-items: center; justify-content: space-between; }
+.prompt-card-header h3 { font-size: 1rem; font-weight: 700; margin: 0; color: var(--text); }
+.prompt-card-badge {
+  font-size: 0.7rem; font-weight: 600; padding: 3px 8px;
+  border-radius: 4px; background: var(--bg-secondary);
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-featured { background: rgba(217,119,87,0.12); color: var(--accent-deep); }
+.prompt-card-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.5; flex-grow: 1; }
+.copy-btn-featured { background: var(--accent-deep); }
+.prompt-details { margin-top: 4px; }
+.prompt-details summary {
+  font-size: 0.78rem; color: var(--text-muted); cursor: pointer;
+  padding: 4px 0; user-select: none;
+}
+.prompt-details summary:hover { color: var(--accent); }
+.copy-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; font-size: 0.82rem; font-weight: 600;
+  font-family: var(--font-sans);
+  background: var(--accent); color: var(--white);
+  border: none; border-radius: 6px; cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.copy-btn:hover { background: var(--accent-deep); }
+.copy-btn:active { transform: scale(0.97); }
+.copy-btn.copied { background: #2d8a4e; }
+.prompt-preview {
+  max-height: 200px; overflow-y: auto; padding: 16px 18px;
+  font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap;
+  word-wrap: break-word; color: var(--text-muted);
+  background: var(--white); margin: 0; border: none;
+  font-family: var(--font-mono);
+}
+.prompt-hint {
+  padding: 10px 18px; font-size: 0.78rem; color: var(--text-muted);
+  background: var(--bg-secondary); margin: 0; border-top: 1px solid var(--border);
+}
+
+/* Tools list */
+.tool-item {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px; margin-bottom: 10px;
+}
+.tool-item h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 3px; color: var(--text); }
+.tool-item p { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+
+/* Related skills */
+.related-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+
+/* Agents grid */
+.agents-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-bottom: 60px; }
+.agent-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.agent-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.agent-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.agent-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+.agent-card .view-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.8rem; margin-top: 10px; color: var(--accent);
+}
+
+/* Commands grid */
+.commands-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding-bottom: 60px; }
+.command-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.command-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.command-card h3 {
+  font-family: var(--font-mono); font-size: 0.95rem; font-weight: 600;
+  margin-bottom: 6px; color: var(--accent);
+}
+.command-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+.command-card .view-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.8rem; margin-top: 10px; color: var(--accent);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px; border-radius: var(--radius); font-size: 0.875rem;
+  font-weight: 500; font-family: var(--font-sans);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  text-decoration: none;
+}
+.btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn-primary:hover { background: #2a2a28; color: var(--bg); box-shadow: var(--shadow); }
+.btn-secondary { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.btn-secondary:hover { background: var(--bg-secondary); color: var(--text); box-shadow: var(--shadow-sm); }
+
+/* Section heading */
+.section-heading {
+  font-family: var(--font-serif); font-size: 1.25rem; font-weight: 700;
+  margin-bottom: 20px; color: var(--text);
+}
+
+/* Footer */
+.footer {
+  padding: 36px 0; border-top: 1px solid var(--border); margin-top: 40px;
+  background: var(--bg);
+}
+.footer-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.footer-links {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 0.85rem; color: var(--text-muted);
+}
+.footer-links a { color: var(--text-muted); }
+.footer-links a:hover { color: var(--accent); }
+.footer-sep { color: var(--border-strong); }
+.footer-credit { font-size: 0.85rem; color: var(--text-muted); }
+.footer-credit a { color: var(--text); font-weight: 600; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .skills-grid, .agents-grid, .related-grid { grid-template-columns: repeat(2, 1fr); }
+  .commands-grid { grid-template-columns: 1fr; }
+  .nav-links { gap: 16px; }
+  .platform-tabs { overflow-x: auto; }
+  .tab-btn { padding: 8px 12px; font-size: 0.8rem; white-space: nowrap; }
+}
+@media (max-width: 480px) {
+  .skills-grid, .agents-grid, .related-grid { grid-template-columns: 1fr; }
+  .filter-bar { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="https://borghei.github.io/Claude-Skills/" class="nav-logo">Claude Skills</a>
+    <div class="nav-links">
+      <a href="https://borghei.github.io/Claude-Skills/skills/" class="active">Skills</a>
+      <a href="https://borghei.github.io/Claude-Skills/agents/">Agents</a>
+      <a href="https://borghei.github.io/Claude-Skills/commands/">Commands</a>
+      <a href="https://github.com/borghei/Claude-Skills" target="_blank" rel="noopener" class="gh-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
+    </div>
+  </div>
+</nav>
+<div class="breadcrumbs container"><a href="https://borghei.github.io/Claude-Skills/">Home</a><span class=sep>/</span><a href="https://borghei.github.io/Claude-Skills/skills/">Skills</a><span class=sep>/</span><a href="https://borghei.github.io/Claude-Skills/skills/engineering/">Engineering</a><span class=sep>/</span><span>Self Improving Agent</span></div>
+<main class="container">
+
+<article class="skill-detail">
+  <div class="page-header">
+    <h1 class="page-title">Self Improving Agent</h1>
+    <p class="page-subtitle">Patterns for building AI agents that learn from their own execution, detect failure modes, and improve autonomously. Covers feedback loops, performance regression detection, memory curation, skill ext...</p>
+    <div class="badge-bar"><span class="badge badge-domain">Engineering</span> <span class="badge badge-subdomain">Ai Agents</span> <span class="badge badge-version">v1.0.0</span> <span class="badge badge-tools"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> 3 tools</span></div>
+    
+  </div>
+  <h2>How to Use</h2>
+<div class="platform-tabs">
+  <button class="tab-btn active" data-tab="quickstart">Quick Start</button>
+  <button class="tab-btn" data-tab="claude">Claude Code</button>
+  <button class="tab-btn" data-tab="codex">Codex</button>
+  <button class="tab-btn" data-tab="gemini">Gemini CLI</button>
+  <button class="tab-btn" data-tab="cursor">Cursor</button>
+  <button class="tab-btn" data-tab="manual">Manual</button>
+</div>
+<div class="tab-content active" id="tab-quickstart">
+  <div class="prompt-cards">
+    <div class="prompt-card">
+      <div class="prompt-card-header">
+        <h3>Try in Chat</h3>
+        <span class="prompt-card-badge">Quick</span>
+      </div>
+      <p class="prompt-card-desc">Paste into any AI chat for instant expertise. Works in one conversation -- no setup needed.</p>
+      <button class="copy-btn" onclick="copyPrompt(this)" data-prompt="You are an expert Self Improving Agent (Engineering domain).
+
+Patterns for building AI agents that learn from their own execution, detect failure modes, and improve autonomously. Covers feedback loops, performance regression detection, memory curation, skill ext...
+
+**Tier:** POWERFUL **Category:** Engineering **Tags:** self-improvement, AI agents, feedback loops, auto-memory, meta-learning, performance tracking
+
+## Your Key Capabilities
+- Sub-Skill Flow
+- The Improvement Loop
+- Improvement Maturity Levels
+- 1. Memory Curation System
+- 2. Feedback Loop Design
+- 3. Performance Regression Detection
+
+## Frameworks &amp; Templates You Know
+- Feedback Capture Template
+- - Add assets/ for templates
+
+## How to Help
+When the user asks for help in this domain:
+1. Ask clarifying questions to understand their context
+2. Apply the relevant framework or workflow from your expertise
+3. Provide actionable, specific output (not generic advice)
+4. Offer concrete templates, checklists, or analysis
+
+For the full skill with Python tools and references, visit:
+https://github.com/borghei/Claude-Skills/tree/main/self-improving-agent
+
+---
+Start by asking the user what they need help with.">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> <span>Copy Prompt</span>
+      </button>
+      <details class="prompt-details">
+        <summary>Preview prompt</summary>
+        <pre class="prompt-preview">You are an expert Self Improving Agent (Engineering domain).
+
+Patterns for building AI agents that learn from their own execution, detect failure modes, and improve autonomously. Covers feedback loops, performance regression detection, memory curation, skill ext...
+
+**Tier:** POWERFUL **Category:** Engineering **Tags:** self-improvement, AI agents, feedback loops, auto-memory, meta-learning, performance tracking
+
+## Your Key Capabilities
+- Sub-Skill Flow
+- The Improvement Loop
+- Improvement Maturity Levels
+- 1. Memory Curation System
+- 2. Feedback Loop Design
+- 3. Performance Regression Detection
+
+## Frameworks &amp; Templates You Know
+- Feedback Capture Template
+- - Add assets/ for templates
+
+## How to Help
+When the user asks for help in this domain:
+1. Ask clarifying questions to understand their context
+2. Apply the relevant framework or workflow from your expertise
+3. Provide actionable, specific output (not generic advice)
+4. Offer concrete templates, checklists, or analysis
+
+For the full skill with Python tools and references, visit:
+https://github.com/borghei/Claude-Skills/tree/main/self-improving-agent
+
+---
+Start by asking the user what they need help with.</pre>
+      </details>
+    </div>
+    <div class="prompt-card prompt-card-featured">
+      <div class="prompt-card-header">
+        <h3>Add to My AI</h3>
+        <span class="prompt-card-badge badge-featured">Full Skill</span>
+      </div>
+      <p class="prompt-card-desc">Creates a permanent Claude Project or Custom GPT with the complete skill. The AI will guide you through setup step by step.</p>
+      <button class="copy-btn copy-btn-featured" onclick="copyPrompt(this)" data-prompt="# Create a &quot;Self Improving Agent&quot; AI Skill
+
+I want you to help me set up a reusable AI skill that I can use in future conversations. Read the complete skill definition below, then help me install it.
+
+## Complete Skill Definition
+
+# Self-Improving Agent - Autonomous Learning Patterns
+
+**Tier:** POWERFUL
+**Category:** Engineering
+**Tags:** self-improvement, AI agents, feedback loops, auto-memory, meta-learning, performance tracking
+
+## Overview
+
+Self-Improving Agent provides architectural patterns for AI agents that get better with use. Most agents are stateless -- they make the same mistakes repeatedly because they lack mechanisms to learn from their own execution. This skill addresses that gap with concrete patterns for feedback capture, memory curation, skill extraction, and regression detection.
+
+The key insight: auto-memory captures everything, but curation is what turns noise into knowledge.
+
+## Sub-Skills
+
+This skill uses compound sub-skill architecture. Each sub-skill in `skills/` handles a specific step of the improvement loop:
+
+| Sub-Skill | File | Purpose |
+|-----------|------|---------|
+| **Remember** | `skills/remember.md` | Capture errors and learnings from current session |
+| **Extract** | `skills/extract.md` | Extract reusable patterns from completed work |
+| **Promote** | `skills/promote.md` | Graduate proven patterns to permanent rules |
+| **Review** | `skills/review.md` | Audit memory health, prune stale entries |
+| **Status** | `skills/status.md` | Dashboard showing memory state and learning progress |
+
+### Sub-Skill Flow
+
+```
+Remember ──&gt; Extract ──&gt; Promote ──&gt; Review
+    ^                                  │
+    └──────────── Status ◄─────────────┘
+```
+
+**The improvement cycle:** Remember captures events during work, Extract identifies patterns across sessions, Promote graduates proven patterns to rules, Review maintains memory health, and Status provides visibility into the entire system.
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/pattern_extractor.py` | Extract reusable patterns from session logs |
+| `scripts/memory_health_checker.py` | Audit memory for stale, duplicate, and promotable entries |
+| `scripts/rule_promoter.py` | Validate and apply promotions from memory to rules |
+| `scripts/feedback_analyzer.py` | Analyze feedback logs for success rates and opportunities |
+| `scripts/regression_detector.py` | Compare baseline vs current performance metrics |
+| `scripts/rule_manager.py` | Manage a learned rules knowledge base with CRUD |
+
+## Core Architecture
+
+### The Improvement Loop
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                   SELF-IMPROVEMENT CYCLE                  │
+│                                                          │
+│  ┌─────────┐    ┌──────────┐    ┌─────────────┐        │
+│  │ Execute  │───▶│ Evaluate │───▶│ Extract     │        │
+│  │ Task     │    │ Outcome  │    │ Learnings   │        │
+│  └─────────┘    └──────────┘    └─────────────┘        │
+│       ▲                               │                  │
+│       │                               ▼                  │
+│  ┌─────────┐    ┌──────────┐    ┌─────────────┐        │
+│  │ Apply   │◀───│ Promote  │◀───│ Validate    │        │
+│  │ Rules   │    │ to Rules │    │ Learnings   │        │
+│  └─────────┘    └──────────┘    └─────────────┘        │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Improvement Maturity Levels
+
+| Level | Name | Mechanism | Example |
+|-------|------|-----------|---------|
+| 0 | Stateless | No memory between sessions | Default agent behavior |
+| 1 | Recording | Captures observations, no action | Auto-memory logging |
+| 2 | Curating | Organizes and deduplicates observations | Memory review + cleanup |
+| 3 | Promoting | Graduates patterns to enforced rules | MEMORY.md entries become CLAUDE.md rules |
+| 4 | Extracting | Creates reusable skills from proven patterns | Recurring solutions become skill packages |
+| 5 | Meta-Learning | Adapts learning strategy itself | Adjusts what to capture based on what proved useful |
+
+Most agents operate at Level 0-1. This skill provides the machinery for Levels 2-5.
+
+## Core Capabilities
+
+### 1. Memory Curation System
+
+#### The Memory Stack
+
+```
+┌─────────────────────────────────────────────────┐
+│  CLAUDE.md / .claude/rules/                      │
+│  Highest authority. Enforced every session.       │
+│  Capacity: Unlimited. Load: Full file.           │
+├─────────────────────────────────────────────────┤
+│  MEMORY.md (auto-memory)                         │
+│  Project learnings. Auto-captured by Claude.     │
+│  Capacity: First 200 lines loaded. Overflow to   │
+│  topic files.                                    │
+├─────────────────────────────────────────────────┤
+│  Session Context                                  │
+│  Current conversation. Ephemeral.                │
+│  Capacity: Context window.                       │
+└─────────────────────────────────────────────────┘
+```
+
+#### Memory Review Protocol
+
+Run periodically (weekly or after every 10 sessions):
+
+```
+Step 1: Read MEMORY.md and all topic files
+Step 2: Classify each entry
+
+  Categories:
+  - PROMOTE: Pattern proven 3+ times, should be a rule
+  - CONSOLIDATE: Multiple entries saying the same thing
+  - STALE: References deleted files, old patterns, resolved issues
+  - KEEP: Still relevant, not yet proven enough to promote
+  - EXTRACT: Recurring solution that should be a reusable skill
+
+Step 3: Execute actions
+  - PROMOTE entries → move to CLAUDE.md or .claude/rules/
+  - CONSOLIDATE entries → merge into single clear entry
+  - STALE entries → delete
+  - EXTRACT entries → create skill package (see Skill Extraction)
+
+Step 4: Verify MEMORY.md is under 200 lines
+  - If over 200: move topic-specific entries to topic files
+  - Topic files: ~/.claude/projects/&lt;path&gt;/memory/&lt;topic&gt;.md
+```
+
+#### Promotion Criteria
+
+An entry is ready for promotion when:
+
+| Criterion | Threshold | Why |
+|-----------|-----------|-----|
+| Recurrence | Seen in 3+ sessions | Not a one-off |
+| Consistency | Same solution every time | Not context-dependent |
+| Impact | Prevented errors or saved significant time | Worth enforcing |
+| Stability | Underlying code/system unchanged | Won&#x27;t immediately become stale |
+| Clarity | Can be stated in 1-2 sentences | Rules must be unambiguous |
+
+#### Promotion Targets
+
+| Pattern Type | Promote To | Example |
+|-------------|-----------|---------|
+| Coding convention | `.claude/rules/&lt;area&gt;.md` | &quot;Always use `type` not `interface` for object shapes&quot; |
+| Project architecture | `CLAUDE.md` | &quot;All API routes go through middleware chain&quot; |
+| Tool preference | `CLAUDE.md` | &quot;Use pnpm, not npm&quot; |
+| Debugging pattern | `.claude/rules/debugging.md` | &quot;When tests fail, check env vars first&quot; |
+| File-scoped rule | `.claude/rules/&lt;scope&gt;.md` with `paths:` | &quot;In migrations/, always add down migration&quot; |
+
+### 2. Feedback Loop Design
+
+#### Outcome Classification
+
+Every agent task produces an outcome. Classify it:
+
+```
+SUCCESS         - Task completed, user accepted result
+PARTIAL         - Task completed but required corrections
+FAILURE         - Task failed, user had to redo
+REJECTION       - User explicitly rejected approach
+TIMEOUT         - Task exceeded time/token budget
+ERROR           - Technical error (tool failure, API error)
+```
+
+#### Signal Extraction from Outcomes
+
+| Outcome | Signal | Memory Action |
+|---------|--------|---------------|
+| SUCCESS (first try) | Approach works well | Reinforce (increment confidence) |
+| SUCCESS (after correction) | Initial approach had gap | Log the correction pattern |
+| PARTIAL (user edited result) | Output format or content gap | Log what user changed |
+| FAILURE | Approach fundamentally wrong | Log anti-pattern with context |
+| REJECTION | Misunderstood requirements | Log clarification pattern |
+| Repeated ERROR | Tool or environment issue | Log workaround or fix |
+
+#### Feedback Capture Template
+
+```markdown
+## Learning: [Short description]
+
+**Context:** [What task was being performed]
+**What happened:** [Outcome description]
+**Root cause:** [Why the outcome occurred]
+**Correct approach:** [What should have been done]
+**Confidence:** [High/Medium/Low]
+**Recurrence:** [First time / Seen N times]
+**Action:** [KEEP / PROMOTE / EXTRACT]
+```
+
+### 3. Performance Regression Detection
+
+#### Metrics to Track
+
+| Metric | Measurement | Regression Signal |
+|--------|-------------|-------------------|
+| First-attempt success rate | Tasks accepted without correction | Dropping below 70% |
+| Correction count per task | User edits after agent output | Rising above 2 per task |
+| Tool error rate | Failed tool calls / total calls | Rising above 5% |
+| Context relevance | Retrieved context actually used | Dropping below 60% |
+| Task completion time | Turns to complete task | Rising trend over 5 sessions |
+
+#### Regression Response Protocol
+
+```
+1. DETECT: Metric crosses threshold
+2. DIAGNOSE: Compare recent sessions vs baseline
+   - What changed? (New code? New patterns? New tools?)
+   - Which task types are affected?
+   - Is it a memory issue or a capability issue?
+3. RESPOND:
+   - Memory issue → Review and curate MEMORY.md
+   - Stale rules → Update CLAUDE.md
+   - New code patterns → Add rules for new patterns
+   - Capability gap → Extract as skill request
+4. VERIFY: Track metric for next 3 sessions
+```
+
+### 4. Skill Extraction
+
+When a solution pattern is proven and reusable, extract it into a standalone skill.
+
+#### Extraction Criteria
+
+```
+A pattern is ready for extraction when:
+- Used successfully 5+ times across different contexts
+- Solution is generalizable (not project-specific)
+- Takes more than trivial effort to recreate from scratch
+- Would benefit other projects/users
+```
+
+#### Extraction Process
+
+```
+Step 1: Document the pattern
+  - What problem does it solve?
+  - What&#x27;s the step-by-step approach?
+  - What are the inputs and outputs?
+  - What are the edge cases?
+
+Step 2: Generalize
+  - Remove project-specific details
+  - Identify configurable parameters
+  - Add handling for common variations
+
+Step 3: Package as skill
+  - Create SKILL.md with frontmatter
+  - Add references/ for knowledge bases
+  - Add scripts/ if automatable
+  - Add assets/ for templates
+
+Step 4: Validate
+  - Test on a different project
+  - Have another person/agent use it
+  - Iterate on unclear instructions
+```
+
+### 5. Meta-Learning Patterns
+
+#### Adaptive Capture Strategy
+
+Not all observations are equally valuable. Adjust what gets captured based on what proved useful:
+
+```
+Initial strategy: Capture everything
+After 10 sessions: Analyze which captured items led to promotions
+After 20 sessions: Adjust capture to focus on high-value categories
+
+High-value categories (typically):
+  - Error resolutions (80% promotion rate)
+  - User corrections (70% promotion rate)
+  - Tool preferences (60% promotion rate)
+
+Low-value categories (typically):
+  - File structure observations (10% promotion rate)
+  - One-off workarounds (5% promotion rate)
+```
+
+#### Anti-Pattern Detection
+
+Beyond capturing what works, actively detect what fails:
+
+| Anti-Pattern | Detection Signal | Response |
+|-------------|-----------------|----------|
+| Repeated wrong import path | Same correction 3+ times | Add to CLAUDE.md as rule |
+| Wrong test framework used | User always changes test approach | Add testing rules |
+| Incorrect API usage | Same API error pattern | Add API usage notes |
+| Style guide violations | User reformats same patterns | Add style rules |
+| Wrong branch workflow | User corrects git operations | Add git workflow rules |
+
+### 6. Continuous Calibration
+
+#### Confidence Scoring
+
+Every piece of learned knowledge carries a confidence score:
+
+```
+Confidence = base_score * recency_factor * consistency_factor
+
+base_score:
+  - User explicitly stated: 1.0
+  - Observed from successful outcome: 0.8
+  - Inferred from pattern: 0.6
+  - Guessed from context: 0.3
+
+recency_factor:
+  - Last 7 days: 1.0
+  - 7-30 days: 0.9
+  - 30-90 days: 0.7
+  - 90+ days: 0.5
+
+consistency_factor:
+  - Never contradicted: 1.0
+  - Contradicted once, reaffirmed: 0.9
+  - Contradicted, not reaffirmed: 0.5
+  - Actively contradicted: 0.0 (delete)
+```
+
+#### Belief Revision
+
+When new information contradicts existing knowledge:
+
+```
+1. Compare confidence scores
+2. If new info higher confidence → update knowledge
+3. If roughly equal → flag for user confirmation
+4. If new info lower confidence → keep existing, note conflict
+5. Always log the conflict for review
+```
+
+## Workflows
+
+### Workflow 1: Weekly Memory Health Check
+
+```
+1. Read all memory files (MEMORY.md + topic files)
+2. Count total entries and lines
+3. For each entry, classify: PROMOTE / CONSOLIDATE / STALE / KEEP / EXTRACT
+4. Execute promotions (with user confirmation)
+5. Execute consolidations
+6. Delete stale entries
+7. Verify under 200-line limit
+8. Report: entries promoted, consolidated, deleted, remaining
+```
+
+### Workflow 2: Post-Session Learning Capture
+
+```
+1. Review session outcomes (successes, corrections, failures)
+2. For each correction: log what was wrong and what was right
+3. For each failure: log root cause and correct approach
+4. Check existing memory for related entries
+5. If related entry exists: increment recurrence count
+6. If new: add entry with context
+7. If recurrence threshold met: flag for promotion
+```
+
+### Workflow 3: Regression Investigation
+
+```
+1. Identify the degraded metric
+2. Pull last 5 sessions&#x27; outcomes for that task type
+3. Compare against baseline (first 5 sessions)
+4. Identify what changed: memory, code, rules, environment
+5. Propose fix: update rule, add rule, retrain pattern
+6. Apply fix
+7. Monitor next 3 sessions
+```
+
+## Common Pitfalls
+
+| Pitfall | Why It Happens | Fix |
+|---------|---------------|-----|
+| Memory bloat | Auto-capture without curation | Weekly review, enforce 200-line limit |
+| Stale rules | Code changes, rules don&#x27;t update | Timestamp rules, periodic re-verification |
+| Over-promotion | Promoting one-off patterns as rules | Require 3+ recurrences before promotion |
+| Silent regression | No metrics tracking | Implement outcome classification |
+| Cargo cult rules | Copying rules without understanding | Each rule must have a &quot;why&quot; annotation |
+| Contradiction spirals | New rules conflict with old rules | Belief revision protocol |
+
+## Integration Points
+
+| Skill | Integration |
+|-------|-------------|
+| **context-engine** | Context Engine manages what the agent sees; Self-Improving Agent manages what the agent remembers |
+| **agent-designer** | Agent Designer defines agent architecture; Self-Improving Agent adds the learning layer |
+| **prompt-engineer-toolkit** | Prompts that degrade over time are a regression; track and test them |
+| **observability-designer** | Monitor agent performance metrics alongside system metrics |
+
+## References
+
+- `references/feedback-loop-patterns.md` - Detailed feedback capture and analysis patterns
+- `references/memory-curation-guide.md` - Step-by-step memory review and promotion procedures
+- `references/meta-learning-architectures.md` - Advanced patterns for agents that learn how to learn
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| MEMORY.md exceeds 200 lines and keeps growing | Auto-capture enabled without scheduled curation | Run the Weekly Memory Health Check workflow; split topic-specific entries into `memory/&lt;topic&gt;.md` files |
+| Promoted rules contradict each other | Two conflicting patterns both crossed the 3-recurrence threshold | Apply the Belief Revision protocol -- compare confidence scores, resolve the conflict, delete the weaker rule |
+| Agent performance degrades after a promotion batch | Newly promoted rules interact badly or are overly prescriptive | Roll back the most recent promotions, re-validate each rule in isolation, and promote incrementally |
+| Skill extraction produces a package that only works on the original project | Generalization step was skipped or rushed | Revisit Extraction Process Step 2 -- strip project-specific details, parameterize hardcoded values, test on a second project before packaging |
+| Feedback loop captures noise (trivial observations dominate) | Capture strategy has not been calibrated with the Adaptive Capture Strategy | After 10 sessions, analyze promotion rates by category and restrict capture to high-value categories (error resolutions, user corrections, tool preferences) |
+| Regression Detection flags false positives | Thresholds set too aggressively for early-stage projects | Widen thresholds during the first 20 sessions (e.g., first-attempt success 60% instead of 70%), then tighten once a stable baseline exists |
+| Confidence scores decay too fast on valid long-term rules | Recency factor penalizes rules that are infrequently encountered but still correct | For rules explicitly confirmed by the user, override the recency factor to 1.0 regardless of age |
+
+## Success Criteria
+
+- **First-attempt success rate above 80%** after 20 sessions of active self-improvement, measured as tasks accepted without user correction.
+- **Memory size stays under 200 lines** in MEMORY.md at all times, with overflow correctly routed to topic files.
+- **Promotion rate of 15-25%** of captured observations within 30 days, indicating the capture strategy targets high-value signals.
+- **Zero stale rules** remaining after each Weekly Memory Health Check -- every rule references current code, tools, and workflows.
+- **Regression detection latency under 3 sessions** -- performance degradation is flagged within 3 sessions of onset, not discovered weeks later.
+- **Extracted skills reusable across 2+ projects** without modification, validating that the generalization step produces genuinely portable packages.
+- **Contradiction resolution within 1 session** -- conflicting rules are detected and resolved via the Belief Revision protocol before they cause downstream errors.
+
+## Scope &amp; Limitations
+
+**This skill covers:**
+- Architectural patterns for building agents that learn from execution history and user feedback.
+- Memory lifecycle management: capture, curation, promotion, and retirement of learned knowledge.
+- Performance regression detection frameworks and response protocols for agent systems.
+- Skill extraction methodology for graduating proven patterns into reusable, standalone packages.
+
+**This skill does NOT cover:**
+- Runtime agent orchestration or multi-agent coordination -- see `agent-workflow-designer` and `agent-protocol` for those patterns.
+- Prompt engineering, testing, or versioning of the prompts themselves -- see `prompt-engineer-toolkit` for prompt lifecycle management.
+- Infrastructure-level observability (logging, tracing, alerting dashboards) -- see `observability-designer` for system-level monitoring.
+- Initial agent architecture design, tool selection, or capability planning -- see `agent-designer` for foundational agent design decisions.
+
+## Integration Points
+
+| Skill | Integration | Data Flow |
+|-------|-------------|-----------|
+| **context-engine** | Context Engine controls what the agent sees per session; Self-Improving Agent decides what is worth remembering long-term | Promoted rules and curated memory flow into context retrieval; context relevance metrics flow back for regression tracking |
+| **agent-designer** | Agent Designer defines the agent&#x27;s architecture and capabilities; Self-Improving Agent layers learning infrastructure on top | Architecture constraints inform what feedback loops are possible; extracted skills feed back as new agent capabilities |
+| **prompt-engineer-toolkit** | Prompts degrade over time as codebases evolve; Self-Improving Agent detects prompt regression via outcome tracking | Performance metrics flag underperforming prompts; prompt updates feed back as rule changes in CLAUDE.md |
+| **observability-designer** | Observability provides system-level metrics; Self-Improving Agent provides agent-behavior-level metrics | System telemetry enriches regression diagnosis; agent performance metrics can be exported to observability dashboards |
+| **tech-debt-tracker** | Stale rules and bloated memory are a form of technical debt; Tech Debt Tracker can surface them alongside code debt | Memory health metrics feed into debt scoring; debt prioritization informs which stale rules to retire first |
+| **agent-workflow-designer** | Multi-step agent workflows benefit from per-step feedback capture and cross-workflow pattern extraction | Per-step outcome data flows into feedback loops; extracted workflow optimizations flow back as updated workflow definitions |
+
+---
+
+## What I Need You to Do
+
+First, detect which platform I&#x27;m using (Claude.ai, ChatGPT, etc.) and follow the matching instructions below.
+
+### If I&#x27;m on Claude.ai:
+
+Walk me through these exact steps:
+
+1. **Create the Project:** Tell me to go to **claude.ai &gt; Projects &gt; Create project** and name it **&quot;Self Improving Agent&quot;**
+
+2. **Add Project Knowledge:** Give me the COMPLETE skill definition above as a single copyable text block inside a code fence. Tell me to click **&quot;Add content&quot; &gt; &quot;Add text content&quot;** inside the project, then paste that entire block. Do NOT say &quot;paste from above&quot; -- give me the actual text to copy right there.
+
+3. **Set Custom Instructions:** Tell me to open project settings and paste this exact instruction:
+   &quot;You are an expert Self Improving Agent in the Engineering domain. Use the project knowledge as your expertise. Follow the workflows, frameworks, and templates defined there. Always provide specific, actionable output.&quot;
+
+4. **Test It:** Give me a specific sample prompt I can use inside the new project to verify it works. Pick a real task from the skill&#x27;s workflows.
+
+### If I&#x27;m on ChatGPT:
+
+Walk me through these exact steps:
+
+1. **Create a Custom GPT:** Tell me to go to **chatgpt.com &gt; Explore GPTs &gt; Create**
+2. **Configure it:**
+   - Name: **&quot;Self Improving Agent&quot;**
+   - Description: &quot;Patterns for building AI agents that learn from their own execution, detect failure modes, and improve autonomously. Covers feedback loops, performance regression detection, memory curation, skill ext...&quot;
+   - Instructions: Give me the COMPLETE skill definition above as a single copyable text block inside a code fence to paste into the Instructions field. Do NOT say &quot;paste from above.&quot;
+3. **Test It:** Give me a sample prompt to verify it works.
+
+### If I&#x27;m on another platform:
+Ask which tool I&#x27;m using and adapt the instructions accordingly.
+
+## Important
+- Always provide the full skill text in a ready-to-copy code block -- never tell me to &quot;scroll up&quot; or &quot;copy from above&quot;
+- Keep the setup steps simple and numbered
+- After setup, test it with me using a real workflow from the skill
+
+Source: https://github.com/borghei/Claude-Skills/tree/main/engineering/self-improving-agent/SKILL.md">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> <span>Copy &amp; Create Skill</span>
+      </button>
+      <details class="prompt-details">
+        <summary>Preview prompt</summary>
+        <pre class="prompt-preview"># Create a &quot;Self Improving Agent&quot; AI Skill
+
+I want you to help me set up a reusable AI skill that I can use in future conversations. Read the complete skill definition below, then help me install it.
+
+## Complete Skill Definition
+
+# Self-Improving Agent - Autonomous Learning Patterns
+
+**Tier:** POWERFUL
+**Category:** Engineering
+**Tags:** self-improvement, AI agents, feedback loops, auto-memory, meta-learning, performance tracking
+
+## Overview
+
+Self-Improving Agent provides architectural patterns for AI agents that get better with use. Most agents are stateless -- they make the same mistakes repeatedly because they lack mechanisms to learn from their own execution. This skill addresses that gap with concrete patterns for feedback capture, memory curation, skill extraction, and regression detection.
+
+The key insight: auto-memory captures everything, but curation is what turns noise into knowledge.
+
+## Sub-Skills
+
+This skill uses compound sub-skill architecture. Each sub-skill in `skills/` handles a specific step of the improvement loop:
+
+| Sub-Skill | File | Purpose |
+|-----------|------|---------|
+| **Remember** | `skills/remember.md` | Capture errors and learnings from current session |
+| **Extract** | `skills/extract.md` | Extract reusable patterns from completed work |
+| **Promote** | `skills/promote.md` | Graduate proven patterns to permanent rules |
+| **Review** | `skills/review.md` | Audit memory health, prune stale entries |
+| **Status** | `skills/status.md` | Dashboard showing memory state and learning progress |
+
+### Sub-Skill Flow
+
+```
+Remember ──&gt; Extract ──&gt; Promote ──&gt; Review
+    ^                                  │
+    └──────────── Status ◄─────────────┘
+```
+
+**The improvement cycle:** Remember captures events during work, Extract identifies patterns across sessions, Promote graduates proven patterns to rules, Review maintains memory health, and Status provides visibility into the entire system.
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/pattern_extractor.py` | Extract reusable patterns from session logs |
+| `scripts/memory_health_checker.py` | Audit memory for stale, duplicate, and promotable entries |
+| `scripts/rule_promoter.py` | Validate and apply promotions from memory to rules |
+| `scripts/feedback_analyzer.py` | Analyze feedback logs for success rates and opportunities |
+| `scripts/regression_detector.py` | Compare baseline vs current performance metrics |
+| `scripts/rule_manager.py` | Manage a learned rules knowledge base with CRUD |
+
+## Core Architecture
+
+### The Improvement Loop
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                   SELF-IMPROVEMENT CYCLE                  │
+│                                                          │
+│  ┌─────────┐    ┌──────────┐    ┌─────────────┐        │
+│  │ Execute  │───▶│ Evaluate │───▶│ Extract     │        │
+│  │ Task     │    │ Outcome  │    │ Learnings   │        │
+│  └─────────┘    └──────────┘    └─────────────┘        │
+│       ▲                               │                  │
+│       │                               ▼                  │
+│  ┌─────────┐    ┌──────────┐    ┌─────────────┐        │
+│  │ Apply   │◀───│ Promote  │◀───│ Validate    │        │
+│  │ Rules   │    │ to Rules │    │ Learnings   │        │
+│  └─────────┘    └──────────┘    └─────────────┘        │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Improvement Maturity Levels
+
+| Level | Name | Mechanism | Example |
+|-------|------|-----------|---------|
+| 0 | Stateless | No memory between sessions | Default agent behavior |
+| 1 | Recording | Captures observations, no action | Auto-memory logging |
+| 2 | Curating | Organizes and deduplicates observations | Memory review + cleanup |
+| 3 | Promoting | Graduates patterns to enforced rules | MEMORY.md entries become CLAUDE.md rules |
+| 4 | Extracting | Creates reusable skills from proven patterns | Recurring solutions become skill packages |
+| 5 | Meta-Learning | Adapts learning strategy itself | Adjusts what to capture based on what proved useful |
+
+Most agents operate at Level 0-1. This skill provides the machinery for Levels 2-5.
+
+## Core Capabilities
+
+### 1. Memory Curation System
+
+#### The Memory Stack
+
+```
+┌─────────────────────────────────────────────────┐
+│  CLAUDE.md / .claude/rules/                      │
+│  Highest authority. Enforced every session.       │
+│  Capacity: Unlimited. Load: Full file.           │
+├─────────────────────────────────────────────────┤
+│  MEMORY.md (auto-memory)                         │
+│  Project learnings. Auto-captured by Claude.     │
+│  Capacity: First 200 lines loaded. Overflow to   │
+│  topic files.                                    │
+├─────────────────────────────────────────────────┤
+│  Session Context                                  │
+│  Current conversation. Ephemeral.                │
+│  Capacity: Context window.                       │
+└─────────────────────────────────────────────────┘
+```
+
+#### Memory Review Protocol
+
+Run periodically (weekly or after every 10 sessions):
+
+```
+Step 1: Read MEMORY.md and all topic files
+Step 2: Classify each entry
+
+  Categories:
+  - PROMOTE: Pattern proven 3+ times, should be a rule
+  - CONSOLIDATE: Multiple entries saying the same thing
+  - STALE: References deleted files, old patterns, resolved issues
+  - KEEP: Still relevant, not yet proven enough to promote
+  - EXTRACT: Recurring solution that should be a reusable skill
+
+Step 3: Execute actions
+  - PROMOTE entries → move to CLAUDE.md or .claude/rules/
+  - CONSOLIDATE entries → merge into single clear entry
+  - STALE entries → delete
+  - EXTRACT entries → create skill package (see Skill Extraction)
+
+Step 4: Verify MEMORY.md is under 200 lines
+  - If over 200: move topic-specific entries to topic files
+  - Topic files: ~/.claude/projects/&lt;path&gt;/memory/&lt;topic&gt;.md
+```
+
+#### Promotion Criteria
+
+An entry is ready for promotion when:
+
+| Criterion | Threshold | Why |
+|-----------|-----------|-----|
+| Recurrence | Seen in 3+ sessions | Not a one-off |
+| Consistency | Same solution every time | Not context-dependent |
+| Impact | Prevented errors or saved significant time | Worth enforcing |
+| Stability | Underlying code/system unchanged | Won&#x27;t immediately become stale |
+| Clarity | Can be stated in 1-2 sentences | Rules must be unambiguous |
+
+#### Promotion Targets
+
+| Pattern Type | Promote To | Example |
+|-------------|-----------|---------|
+| Coding convention | `.claude/rules/&lt;area&gt;.md` | &quot;Always use `type` not `interface` for object shapes&quot; |
+| Project architecture | `CLAUDE.md` | &quot;All API routes go through middleware chain&quot; |
+| Tool preference | `CLAUDE.md` | &quot;Use pnpm, not npm&quot; |
+| Debugging pattern | `.claude/rules/debugging.md` | &quot;When tests fail, check env vars first&quot; |
+| File-scoped rule | `.claude/rules/&lt;scope&gt;.md` with `paths:` | &quot;In migrations/, always add down migration&quot; |
+
+### 2. Feedback Loop Design
+
+#### Outcome Classification
+
+Every agent task produces an outcome. Classify it:
+
+```
+SUCCESS         - Task completed, user accepted result
+PARTIAL         - Task completed but required corrections
+FAILURE         - Task failed, user had to redo
+REJECTION       - User explicitly rejected approach
+TIMEOUT         - Task exceeded time/token budget
+ERROR           - Technical error (tool failure, API error)
+```
+
+#### Signal Extraction from Outcomes
+
+| Outcome | Signal | Memory Action |
+|---------|--------|---------------|
+| SUCCESS (first try) | Approach works well | Reinforce (increment confidence) |
+| SUCCESS (after correction) | Initial approach had gap | Log the correction pattern |
+| PARTIAL (user edited result) | Output format or content gap | Log what user changed |
+| FAILURE | Approach fundamentally wrong | Log anti-pattern with context |
+| REJECTION | Misunderstood requirements | Log clarification pattern |
+| Repeated ERROR | Tool or environment issue | Log workaround or fix |
+
+#### Feedback Capture Template
+
+```markdown
+## Learning: [Short description]
+
+**Context:** [What task was being performed]
+**What happened:** [Outcome description]
+**Root cause:** [Why the outcome occurred]
+**Correct approach:** [What should have been done]
+**Confidence:** [High/Medium/Low]
+**Recurrence:** [First time / Seen N times]
+**Action:** [KEEP / PROMOTE / EXTRACT]
+```
+
+### 3. Performance Regression Detection
+
+#### Metrics to Track
+
+| Metric | Measurement | Regression Signal |
+|--------|-------------|-------------------|
+| First-attempt success rate | Tasks accepted without correction | Dropping below 70% |
+| Correction count per task | User edits after agent output | Rising above 2 per task |
+| Tool error rate | Failed tool calls / total calls | Rising above 5% |
+| Context relevance | Retrieved context actually used | Dropping below 60% |
+| Task completion time | Turns to complete task | Rising trend over 5 sessions |
+
+#### Regression Response Protocol
+
+```
+1. DETECT: Metric crosses threshold
+2. DIAGNOSE: Compare recent sessions vs baseline
+   - What changed? (New code? New patterns? New tools?)
+   - Which task types are affected?
+   - Is it a memory issue or a capability issue?
+3. RESPOND:
+   - Memory issue → Review and curate MEMORY.md
+   - Stale rules → Update CLAUDE.md
+   - New code patterns → Add rules for new patterns
+   - Capability gap → Extract as skill request
+4. VERIFY: Track metric for next 3 sessions
+```
+
+### 4. Skill Extraction
+
+When a solution pattern is proven and reusable, extract it into a standalone skill.
+
+#### Extraction Criteria
+
+```
+A pattern is ready for extraction when:
+- Used successfully 5+ times across different contexts
+- Solution is generalizable (not project-specific)
+- Takes more than trivial effort to recreate from scratch
+- Would benefit other projects/users
+```
+
+#### Extraction Process
+
+```
+Step 1: Document the pattern
+  - What problem does it solve?
+  - What&#x27;s the step-by-step approach?
+  - What are the inputs and outputs?
+  - What are the edge cases?
+
+Step 2: Generalize
+  - Remove project-specific details
+  - Identify configurable parameters
+  - Add handling for common variations
+
+Step 3: Package as skill
+  - Create SKILL.md with frontmatter
+  - Add references/ for knowledge bases
+  - Add scripts/ if automatable
+  - Add assets/ for templates
+
+Step 4: Validate
+  - Test on a different project
+  - Have another person/agent use it
+  - Iterate on unclear instructions
+```
+
+### 5. Meta-Learning Patterns
+
+#### Adaptive Capture Strategy
+
+Not all observations are equally valuable. Adjust what gets captured based on what proved useful:
+
+```
+Initial strategy: Capture everything
+After 10 sessions: Analyze which captured items led to promotions
+After 20 sessions: Adjust capture to focus on high-value categories
+
+High-value categories (typically):
+  - Error resolutions (80% promotion rate)
+  - User corrections (70% promotion rate)
+  - Tool preferences (60% promotion rate)
+
+Low-value categories (typically):
+  - File structure observations (10% promotion rate)
+  - One-off workarounds (5% promotion rate)
+```
+
+#### Anti-Pattern Detection
+
+Beyond capturing what works, actively detect what fails:
+
+| Anti-Pattern | Detection Signal | Response |
+|-------------|-----------------|----------|
+| Repeated wrong import path | Same correction 3+ times | Add to CLAUDE.md as rule |
+| Wrong test framework used | User always changes test approach | Add testing rules |
+| Incorrect API usage | Same API error pattern | Add API usage notes |
+| Style guide violations | User reformats same patterns | Add style rules |
+| Wrong branch workflow | User corrects git operations | Add git workflow rules |
+
+### 6. Continuous Calibration
+
+#### Confidence Scoring
+
+Every piece of learned knowledge carries a confidence score:
+
+```
+Confidence = base_score * recency_factor * consistency_factor
+
+base_score:
+  - User explicitly stated: 1.0
+  - Observed from successful outcome: 0.8
+  - Inferred from pattern: 0.6
+  - Guessed from context: 0.3
+
+recency_factor:
+  - Last 7 days: 1.0
+  - 7-30 days: 0.9
+  - 30-90 days: 0.7
+  - 90+ days: 0.5
+
+consistency_factor:
+  - Never contradicted: 1.0
+  - Contradicted once, reaffirmed: 0.9
+  - Contradicted, not reaffirmed: 0.5
+  - Actively contradicted: 0.0 (delete)
+```
+
+#### Belief Revision
+
+When new information contradicts existing knowledge:
+
+```
+1. Compare confidence scores
+2. If new info higher confidence → update knowledge
+3. If roughly equal → flag for user confirmation
+4. If new info lower confidence → keep existing, note conflict
+5. Always log the conflict for review
+```
+
+## Workflows
+
+### Workflow 1: Weekly Memory Health Check
+
+```
+1. Read all memory files (MEMORY.md + topic files)
+2. Count total entries and lines
+3. For each entry, classify: PROMOTE / CONSOLIDATE / STALE / KEEP / EXTRACT
+4. Execute promotions (with user confirmation)
+5. Execute consolidations
+6. Delete stale entries
+7. Verify under 200-line limit
+8. Report: entries promoted, consolidated, deleted, remaining
+```
+
+### Workflow 2: Post-Session Learning Capture
+
+```
+1. Review session outcomes (successes, corrections, failures)
+2. For each correction: log what was wrong and what was right
+3. For each failure: log root cause and correct approach
+4. Check existing memory for related entries
+5. If related entry exists: increment recurrence count
+6. If new: add entry with context
+7. If recurrence threshold met: flag for promotion
+```
+
+### Workflow 3: Regression Investigation
+
+```
+1. Identify the degraded metric
+2. Pull last 5 sessions&#x27; outcomes for that task type
+3. Compare against baseline (first 5 sessions)
+4. Identify what changed: memory, code, rules, environment
+5. Propose fix: update rule, add rule, retrain pattern
+6. Apply fix
+7. Monitor next 3 sessions
+```
+
+## Common Pitfalls
+
+| Pitfall | Why It Happens | Fix |
+|---------|---------------|-----|
+| Memory bloat | Auto-capture without curation | Weekly review, enforce 200-line limit |
+| Stale rules | Code changes, rules don&#x27;t update | Timestamp rules, periodic re-verification |
+| Over-promotion | Promoting one-off patterns as rules | Require 3+ recurrences before promotion |
+| Silent regression | No metrics tracking | Implement outcome classification |
+| Cargo cult rules | Copying rules without understanding | Each rule must have a &quot;why&quot; annotation |
+| Contradiction spirals | New rules conflict with old rules | Belief revision protocol |
+
+## Integration Points
+
+| Skill | Integration |
+|-------|-------------|
+| **context-engine** | Context Engine manages what the agent sees; Self-Improving Agent manages what the agent remembers |
+| **agent-designer** | Agent Designer defines agent architecture; Self-Improving Agent adds the learning layer |
+| **prompt-engineer-toolkit** | Prompts that degrade over time are a regression; track and test them |
+| **observability-designer** | Monitor agent performance metrics alongside system metrics |
+
+## References
+
+- `references/feedback-loop-patterns.md` - Detailed feedback capture and analysis patterns
+- `references/memory-curation-guide.md` - Step-by-step memory review and promotion procedures
+- `references/meta-learning-architectures.md` - Advanced patterns for agents that learn how to learn
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| MEMORY.md exceeds 200 lines and keeps growing | Auto-capture enabled without scheduled curation | Run the Weekly Memory Health Check workflow; split topic-specific entries into `memory/&lt;topic&gt;.md` files |
+| Promoted rules contradict each other | Two conflicting patterns both crossed the 3-recurrence threshold | Apply the Belief Revision protocol -- compare confidence scores, resolve the conflict, delete the weaker rule |
+| Agent performance degrades after a promotion batch | Newly promoted rules interact badly or are overly prescriptive | Roll back the most recent promotions, re-validate each rule in isolation, and promote incrementally |
+| Skill extraction produces a package that only works on the original project | Generalization step was skipped or rushed | Revisit Extraction Process Step 2 -- strip project-specific details, parameterize hardcoded values, test on a second project before packaging |
+| Feedback loop captures noise (trivial observations dominate) | Capture strategy has not been calibrated with the Adaptive Capture Strategy | After 10 sessions, analyze promotion rates by category and restrict capture to high-value categories (error resolutions, user corrections, tool preferences) |
+| Regression Detection flags false positives | Thresholds set too aggressively for early-stage projects | Widen thresholds during the first 20 sessions (e.g., first-attempt success 60% instead of 70%), then tighten once a stable baseline exists |
+| Confidence scores decay too fast on valid long-term rules | Recency factor penalizes rules that are infrequently encountered but still correct | For rules explicitly confirmed by the user, override the recency factor to 1.0 regardless of age |
+
+## Success Criteria
+
+- **First-attempt success rate above 80%** after 20 sessions of active self-improvement, measured as tasks accepted without user correction.
+- **Memory size stays under 200 lines** in MEMORY.md at all times, with overflow correctly routed to topic files.
+- **Promotion rate of 15-25%** of captured observations within 30 days, indicating the capture strategy targets high-value signals.
+- **Zero stale rules** remaining after each Weekly Memory Health Check -- every rule references current code, tools, and workflows.
+- **Regression detection latency under 3 sessions** -- performance degradation is flagged within 3 sessions of onset, not discovered weeks later.
+- **Extracted skills reusable across 2+ projects** without modification, validating that the generalization step produces genuinely portable packages.
+- **Contradiction resolution within 1 session** -- conflicting rules are detected and resolved via the Belief Revision protocol before they cause downstream errors.
+
+## Scope &amp; Limitations
+
+**This skill covers:**
+- Architectural patterns for building agents that learn from execution history and user feedback.
+- Memory lifecycle management: capture, curation, promotion, and retirement of learned knowledge.
+- Performance regression detection frameworks and response protocols for agent systems.
+- Skill extraction methodology for graduating proven patterns into reusable, standalone packages.
+
+**This skill does NOT cover:**
+- Runtime agent orchestration or multi-agent coordination -- see `agent-workflow-designer` and `agent-protocol` for those patterns.
+- Prompt engineering, testing, or versioning of the prompts themselves -- see `prompt-engineer-toolkit` for prompt lifecycle management.
+- Infrastructure-level observability (logging, tracing, alerting dashboards) -- see `observability-designer` for system-level monitoring.
+- Initial agent architecture design, tool selection, or capability planning -- see `agent-designer` for foundational agent design decisions.
+
+## Integration Points
+
+| Skill | Integration | Data Flow |
+|-------|-------------|-----------|
+| **context-engine** | Context Engine controls what the agent sees per session; Self-Improving Agent decides what is worth remembering long-term | Promoted rules and curated memory flow into context retrieval; context relevance metrics flow back for regression tracking |
+| **agent-designer** | Agent Designer defines the agent&#x27;s architecture and capabilities; Self-Improving Agent layers learning infrastructure on top | Architecture constraints inform what feedback loops are possible; extracted skills feed back as new agent capabilities |
+| **prompt-engineer-toolkit** | Prompts degrade over time as codebases evolve; Self-Improving Agent detects prompt regression via outcome tracking | Performance metrics flag underperforming prompts; prompt updates feed back as rule changes in CLAUDE.md |
+| **observability-designer** | Observability provides system-level metrics; Self-Improving Agent provides agent-behavior-level metrics | System telemetry enriches regression diagnosis; agent performance metrics can be exported to observability dashboards |
+| **tech-debt-tracker** | Stale rules and bloated memory are a form of technical debt; Tech Debt Tracker can surface them alongside code debt | Memory health metrics feed into debt scoring; debt prioritization informs which stale rules to retire first |
+| **agent-workflow-designer** | Multi-step agent workflows benefit from per-step feedback capture and cross-workflow pattern extraction | Per-step outcome data flows into feedback loops; extracted workflow optimizations flow back as updated workflow definitions |
+
+---
+
+## What I Need You to Do
+
+First, detect which platform I&#x27;m using (Claude.ai, ChatGPT, etc.) and follow the matching instructions below.
+
+### If I&#x27;m on Claude.ai:
+
+Walk me through these exact steps:
+
+1. **Create the Project:** Tell me to go to **claude.ai &gt; Projects &gt; Create project** and name it **&quot;Self Improving Agent&quot;**
+
+2. **Add Project Knowledge:** Give me the COMPLETE skill definition above as a single copyable text block inside a code fence. Tell me to click **&quot;Add content&quot; &gt; &quot;Add text content&quot;** inside the project, then paste that entire block. Do NOT say &quot;paste from above&quot; -- give me the actual text to copy right there.
+
+3. **Set Custom Instructions:** Tell me to open project settings and paste this exact instruction:
+   &quot;You are an expert Self Improving Agent in the Engineering domain. Use the project knowledge as your expertise. Follow the workflows, frameworks, and templates defined there. Always provide specific, actionable output.&quot;
+
+4. **Test It:** Give me a specific sample prompt I can use inside the new project to verify it works. Pick a real task from the skill&#x27;s workflows.
+
+### If I&#x27;m on ChatGPT:
+
+Walk me through these exact steps:
+
+1. **Create a Custom GPT:** Tell me to go to **chatgpt.com &gt; Explore GPTs &gt; Create**
+2. **Configure it:**
+   - Name: **&quot;Self Improving Agent&quot;**
+   - Description: &quot;Patterns for building AI agents that learn from their own execution, detect failure modes, and improve autonomously. Covers feedback loops, performance regression detection, memory curation, skill ext...&quot;
+   - Instructions: Give me the COMPLETE skill definition above as a single copyable text block inside a code fence to paste into the Instructions field. Do NOT say &quot;paste from above.&quot;
+3. **Test It:** Give me a sample prompt to verify it works.
+
+### If I&#x27;m on another platform:
+Ask which tool I&#x27;m using and adapt the instructions accordingly.
+
+## Important
+- Always provide the full skill text in a ready-to-copy code block -- never tell me to &quot;scroll up&quot; or &quot;copy from above&quot;
+- Keep the setup steps simple and numbered
+- After setup, test it with me using a real workflow from the skill
+
+Source: https://github.com/borghei/Claude-Skills/tree/main/engineering/self-improving-agent/SKILL.md</pre>
+      </details>
+    </div>
+  </div>
+</div>
+<div class="tab-content" id="tab-claude">
+  <pre><code># Add to your project
+cs install engineering/self-improving-agent ./
+
+# Or copy directly
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/self-improving-agent your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-codex">
+  <pre><code># The skill is available in your Codex workspace at:
+.codex/skills/self-improving-agent/
+
+# Reference the SKILL.md in your Codex instructions
+# or copy it into your project:
+cp -r .codex/skills/self-improving-agent your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-gemini">
+  <pre><code># The skill is available in your Gemini CLI workspace at:
+.gemini/skills/self-improving-agent/
+
+# Reference the SKILL.md in your Gemini instructions
+# or copy it into your project:
+cp -r .gemini/skills/self-improving-agent your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-cursor">
+  <pre><code># Add to your .cursorrules or workspace settings:
+# Reference: engineering/self-improving-agent/SKILL.md
+
+# Or copy the skill folder into your project:
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/self-improving-agent your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-manual">
+  <pre><code># Clone and copy
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/self-improving-agent your-project/
+
+# Or download just this skill
+curl -sL https://github.com/borghei/Claude-Skills/archive/main.tar.gz | tar xz --strip=1 Claude-Skills-main/engineering/self-improving-agent</code></pre>
+</div>
+<h3>Run Python Tools</h3>
+<pre><code>python engineering/self-improving-agent/scripts/tool_name.py --help</code></pre>
+  
+  
+  <h2>Related Skills in Engineering</h2><div class="related-grid"><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-designer.html" class="skill-card" style="text-decoration:none"><h3>Agent Designer</h3><p>Designs multi-agent system architectures with orchestration patterns, tool schemas, and...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-protocol.html" class="skill-card" style="text-decoration:none"><h3>Agent Protocol</h3><p>Design and implement AI agent communication protocols including MCP tool schemas, Google A2A...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-workflow-designer.html" class="skill-card" style="text-decoration:none"><h3>Agent Workflow Designer</h3><p>Design and implement multi-agent orchestration systems with workflow DAGs, agent routing,...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/api-design-reviewer.html" class="skill-card" style="text-decoration:none"><h3>Api Design Reviewer</h3><p>Reviews REST API designs for quality, consistency, and breaking changes. Lints OpenAPI specs,...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/api-test-suite-builder.html" class="skill-card" style="text-decoration:none"><h3>Api Test Suite Builder</h3><p>Generate comprehensive API test suites from route definitions across frameworks. Covers auth...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/aws-solution-architect.html" class="skill-card" style="text-decoration:none"><h3>Aws Solution Architect</h3><p>Design AWS architectures for startups using serverless patterns and IaC templates. Use when...</p></a></div>
+  <p style="margin-top:32px"><a href="https://github.com/borghei/Claude-Skills/tree/main/engineering/self-improving-agent/SKILL.md" target="_blank" rel="noopener" class="btn btn-secondary">View on GitHub <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a></p>
+</article>
+</main>
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-links">
+      <a href="https://github.com/borghei/Claude-Skills" target="_blank" rel="noopener">GitHub</a>
+      <span class="footer-sep">&middot;</span>
+      <span>MIT + Commons Clause</span>
+      <span class="footer-sep">&middot;</span>
+      <a href="https://buymeacoffee.com/borghei" target="_blank" rel="noopener">Buy Me a Coffee</a>
+    </div>
+    <div class="footer-credit">Built by <a href="https://github.com/borghei" target="_blank" rel="noopener">borghei</a></div>
+  </div>
+</footer>
+<script>
+document.querySelectorAll('.tab-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+    document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active')});
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+function copyPrompt(btn){
+  var text=btn.getAttribute('data-prompt');
+  // Decode HTML entities
+  var ta=document.createElement('textarea');
+  ta.innerHTML=text;
+  text=ta.value;
+  navigator.clipboard.writeText(text).then(function(){
+    btn.classList.add('copied');
+    btn.querySelector('span').textContent='Copied!';
+    setTimeout(function(){
+      btn.classList.remove('copied');
+      btn.querySelector('span').textContent='Copy Prompt';
+    },2000);
+  });
+}
+</script>
+</body>
+</html>

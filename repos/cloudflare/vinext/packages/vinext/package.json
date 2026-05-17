@@ -1,0 +1,109 @@
+{
+  "name": "vinext",
+  "version": "0.0.5",
+  "description": "Run Next.js apps on Vite. Drop-in replacement for the next CLI.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cloudflare/vinext.git"
+  },
+  "bin": {
+    "vinext": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cache": {
+      "types": "./dist/cache.d.ts",
+      "import": "./dist/cache.js"
+    },
+    "./shims/*": {
+      "types": "./dist/shims/*.d.ts",
+      "import": "./dist/shims/*.js"
+    },
+    "./server/prod-server": {
+      "types": "./dist/server/prod-server.d.ts",
+      "import": "./dist/server/prod-server.js"
+    },
+    "./cloudflare": {
+      "types": "./dist/cloudflare/index.d.ts",
+      "import": "./dist/cloudflare/index.js"
+    },
+    "./server/image-optimization": {
+      "types": "./dist/server/image-optimization.d.ts",
+      "import": "./dist/server/image-optimization.js"
+    },
+    "./server/request-pipeline": {
+      "types": "./dist/server/request-pipeline.d.ts",
+      "import": "./dist/server/request-pipeline.js"
+    },
+    "./server/app-router-entry": {
+      "types": "./dist/server/app-router-entry.d.ts",
+      "import": "./dist/server/app-router-entry.js"
+    },
+    "./config/config-matchers": {
+      "types": "./dist/config/config-matchers.d.ts",
+      "import": "./dist/config/config-matchers.js"
+    },
+    "./server/worker-utils": {
+      "types": "./dist/server/worker-utils.d.ts",
+      "import": "./dist/server/worker-utils.js"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "prepack": "cp ../../README.md README.md && vp run build",
+    "dev": "vp pack --watch"
+  },
+  "dependencies": {
+    "@unpic/react": "catalog:",
+    "@vercel/og": "catalog:",
+    "image-size": "catalog:",
+    "ipaddr.js": "catalog:",
+    "magic-string": "catalog:",
+    "vite-plugin-commonjs": "catalog:",
+    "vite-tsconfig-paths": "catalog:",
+    "web-vitals": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitejs/plugin-rsc": "catalog:",
+    "react-server-dom-webpack": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@mdx-js/rollup": "^3.0.0",
+    "@vitejs/plugin-react": "^5.1.4 || ^6.0.0",
+    "@vitejs/plugin-rsc": "^0.5.23",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-server-dom-webpack": "^19.2.6",
+    "vite": "^7.0.0 || ^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@mdx-js/rollup": {
+      "optional": true
+    },
+    "@vitejs/plugin-rsc": {
+      "optional": true
+    },
+    "react-server-dom-webpack": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

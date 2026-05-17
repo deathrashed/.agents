@@ -1,0 +1,52 @@
+# Docs Alias Failure Notification
+#
+# Sends a Slack notification when the versioned docs alias assignment fails.
+
+name: Docs Alias Failure Notification
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  notify-failure:
+    name: "Notify Slack on Docs Alias Failure"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Checkout staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ -f version.txt ]; then
+            IFS= read -r VERSION < version.txt
+
+            if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+              printf 'version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+            else
+              echo "::warning::version.txt did not contain a valid release version. Reporting unknown version."
+              echo "version=unknown" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "version=unknown" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Send failure notification to Slack
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.DOCS_ALIAS_FAILURE_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "version": ${{ toJSON(steps.version.outputs.version) }}
+            }

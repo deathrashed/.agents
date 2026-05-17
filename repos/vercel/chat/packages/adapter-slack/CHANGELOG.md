@@ -1,0 +1,283 @@
+# @chat-adapter/slack
+
+## 4.15.0
+
+### Minor Changes
+
+- 5b3090a: Add CardLink element
+
+### Patch Changes
+
+- f0cfcfa: Can now attach multiple files to the same Slack message, as opposed to breaking by file.
+- Updated dependencies [0f85031]
+- Updated dependencies [5b3090a]
+  - chat@4.15.0
+  - @chat-adapter/shared@4.15.0
+
+## 4.14.0
+
+### Minor Changes
+
+- ef6f370: Add custom installation key prefix support for slack installations
+- 90dc325: Add typing indicators for Slack adapter using Slack assistants API
+
+### Patch Changes
+
+- Updated dependencies [90dc325]
+  - chat@4.14.0
+  - @chat-adapter/shared@4.14.0
+
+## 4.13.4
+
+### Patch Changes
+
+- f266dcf: Automatically load from env vars
+- Updated dependencies [716ce2a]
+  - chat@4.13.4
+  - @chat-adapter/shared@4.13.4
+
+## 4.13.3
+
+### Patch Changes
+
+- Updated dependencies [ce33270]
+  - chat@4.13.3
+  - @chat-adapter/shared@4.13.3
+
+## 4.13.2
+
+### Patch Changes
+
+- Updated dependencies [7d00feb]
+  - chat@4.13.2
+  - @chat-adapter/shared@4.13.2
+
+## 4.13.1
+
+### Patch Changes
+
+- 09cdfa3: fix(slack,gchat): convert **bold** to _bold_ in Card text blocks
+
+  CardText content with standard Markdown bold was rendering literally in Slack and Google Chat. Both platforms use single asterisk for bold. Added markdownToMrkdwn conversion in convertTextToBlock and field converters.
+
+  - chat@4.13.1
+  - @chat-adapter/shared@4.13.1
+
+## 4.13.0
+
+### Minor Changes
+
+- f371c0d: feat(slack): full Slack Assistants API support
+
+  - Route `assistant_thread_started` and `assistant_thread_context_changed` events
+  - Add `onAssistantThreadStarted` and `onAssistantContextChanged` handler registration
+  - Add `setSuggestedPrompts`, `setAssistantStatus`, `setAssistantTitle` methods on Slack adapter
+  - Extend `stream()` to accept `stopBlocks` for Block Kit on stream finalization
+  - Bump `@slack/web-api` to `^7.11.0` for `chatStream` support
+  - Export all new types
+
+### Patch Changes
+
+- Updated dependencies [f371c0d]
+  - chat@4.13.0
+  - @chat-adapter/shared@4.13.0
+
+## 4.12.0
+
+### Minor Changes
+
+- 8c50252: Adding support for slash commands.
+
+### Patch Changes
+
+- Updated dependencies [8c50252]
+  - chat@4.12.0
+  - @chat-adapter/shared@4.12.0
+
+## 4.11.0
+
+### Minor Changes
+
+- 417374b: Adding inline Select components and Radio buttons to cards
+
+### Patch Changes
+
+- Updated dependencies [417374b]
+  - chat@4.11.0
+  - @chat-adapter/shared@4.11.0
+
+## 4.10.1
+
+### Patch Changes
+
+- c99b183: Added support for creating modals from ephemeral messages.
+- Updated dependencies [c99b183]
+  - chat@4.10.1
+  - @chat-adapter/shared@4.10.1
+
+## 4.10.0
+
+### Minor Changes
+
+- c7d51cb: Added support for passing arbitrary metadata through the modal lifecycle via a new privateMetadata field.
+
+### Patch Changes
+
+- Updated dependencies [c7d51cb]
+  - chat@4.10.0
+  - @chat-adapter/shared@4.10.0
+
+## 4.9.1
+
+### Patch Changes
+
+- Updated dependencies [18ce1d0]
+  - @chat-adapter/shared@4.9.1
+  - chat@4.9.1
+
+## 4.9.0
+
+### Minor Changes
+
+- 8979049: Add multi-workspace support. A single Slack adapter instance can now serve multiple workspaces by resolving bot tokens per-request via AsyncLocalStorage. Includes OAuth V2 flow handling, installation management (set/get/delete), optional AES-256-GCM token encryption at rest, and a withBotToken helper for out-of-webhook contexts
+
+### Patch Changes
+
+- chat@4.9.0
+- @chat-adapter/shared@4.9.0
+
+## 4.8.0
+
+### Patch Changes
+
+- ba2a9ca: Fix double-wrapping of Slack mentions when input already contains `<@user>` format
+- Updated dependencies [cca9867]
+  - chat@4.8.0
+  - @chat-adapter/shared@4.8.0
+
+## 4.7.2
+
+### Patch Changes
+
+- efaa916: Allow streaming when images attached on thread start
+  - chat@4.7.2
+  - @chat-adapter/shared@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- 160f1f7: Fetch relatedMessage separately from the event thread.
+- Updated dependencies [160f1f7]
+  - chat@4.7.1
+  - @chat-adapter/shared@4.7.1
+
+## 4.7.0
+
+### Minor Changes
+
+- a13f43e: Add relatedThread and relatedMessage to modal events.
+
+### Patch Changes
+
+- Updated dependencies [a13f43e]
+  - chat@4.7.0
+  - @chat-adapter/shared@4.7.0
+
+## 4.6.0
+
+### Minor Changes
+
+- 68e3f74: Add <LinkButton> component
+
+### Patch Changes
+
+- Updated dependencies [68e3f74]
+  - chat@4.6.0
+  - @chat-adapter/shared@4.6.0
+
+## 4.5.0
+
+### Minor Changes
+
+- efa6b36: add postEphemeral() for ephemeral messages
+
+### Patch Changes
+
+- Updated dependencies [efa6b36]
+  - chat@4.5.0
+  - @chat-adapter/shared@4.5.0
+
+## 4.4.1
+
+### Patch Changes
+
+- b5826c2: Adding private metadata field to `onModalClose` events.
+- 9e8f9e7: Serde support
+- Updated dependencies [1882732]
+- Updated dependencies [b5826c2]
+- Updated dependencies [9e8f9e7]
+  - chat@4.4.1
+  - @chat-adapter/shared@4.4.1
+
+## 4.4.0
+
+### Minor Changes
+
+- 8ca6371: Add support for modals, modal events, text inputs and selectors.
+
+### Patch Changes
+
+- Updated dependencies [8ca6371]
+  - chat@4.4.0
+  - @chat-adapter/shared@4.4.0
+
+## 4.3.0
+
+### Minor Changes
+
+- 498eb04: Discord support
+
+### Patch Changes
+
+- d80ea3f: Refactor
+- Updated dependencies [498eb04]
+- Updated dependencies [d80ea3f]
+  - @chat-adapter/shared@4.3.0
+  - chat@4.3.0
+
+## 4.2.0
+
+### Minor Changes
+
+- 0b5197a: Fixed and tested fetchMessages and allMessages
+
+### Patch Changes
+
+- Updated dependencies [0b5197a]
+  - chat@4.2.0
+
+## 4.1.0
+
+### Minor Changes
+
+- 9b95317: Native streaming support
+
+### Patch Changes
+
+- Updated dependencies [9b95317]
+  - chat@4.1.0
+
+## 4.0.2
+
+### Patch Changes
+
+- chat@4.0.2
+
+## 4.0.1
+
+### Patch Changes
+
+- b27ea10: READMEs
+- Updated dependencies [b27ea10]
+  - chat@4.0.1

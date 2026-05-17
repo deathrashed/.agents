@@ -1,0 +1,10 @@
+{
+  "extends": "tsconfig/react-library.json",
+  "compilerOptions": {
+    "paths": {
+      "react-email": ["./stub.ts"]
+    },
+    "moduleResolution": "bundler"
+  },
+  "include": ["."]
+}

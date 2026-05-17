@@ -1,0 +1,366 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0  # Full history for comparison
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tests/package.json
+
+      - name: Install tests dependencies
+        working-directory: ./tests
+        run: npm ci --ignore-scripts
+
+      - name: Install scripts dependencies
+        working-directory: ./scripts
+        run: npm ci --ignore-scripts
+
+      - name: Typecheck tests
+        working-directory: ./tests
+        run: npm run typecheck
+
+      - name: Typecheck scripts
+        working-directory: ./scripts
+        run: npm run typecheck
+
+      - name: Lint test
+        working-directory: ./tests
+        run: npm run lint
+
+      - name: Lint scripts
+        working-directory: ./scripts
+        run: npm run lint
+
+  # Token limit check and comparison for markdown files.
+  # The comment is posted by a separate workflow (pr-comment.yml) triggered via workflow_run,
+  # so the commenting code always runs from main — not the PR branch.
+  token-analysis:
+    name: Token Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0  # Full history for comparison
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/package.json
+
+      - name: Install scripts dependencies
+        working-directory: ./scripts
+        run: npm ci --ignore-scripts
+
+      - name: Check Copilot CLI skill char budget
+        working-directory: ./scripts
+        run: npm run checkCopilotCliCharBudget
+
+      - name: Check changed markdown files
+        id: changed-files
+        uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
+        with:
+          files: |
+            **/*.md
+            **/*.mdx
+            .token-limits.json
+
+      - name: Run token limit check
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: token-check
+        working-directory: ./scripts
+        run: |
+          LIMIT_OUTPUT=""
+          if LIMIT_OUTPUT=$(npm run tokens -- check --markdown 2>&1); then
+            echo "$LIMIT_OUTPUT" > ../limit-report.md
+            echo "exceeded=false" >> $GITHUB_OUTPUT
+          else
+            echo "$LIMIT_OUTPUT" > ../limit-report.md
+            echo "exceeded=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run token comparison
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: token-compare
+        working-directory: ./scripts
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # Validate BASE_REF to avoid unsafe characters in shell command
+          if ! echo "$BASE_REF" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]*$'; then
+            echo "Error: Invalid base ref: '$BASE_REF'. Aborting token comparison."
+            exit 1
+          fi
+
+          COMPARE_OUTPUT=$(npm run tokens -- compare --base "origin/${BASE_REF}" --head HEAD --markdown 2>&1)
+          echo "$COMPARE_OUTPUT" > ../compare-report.md
+          
+          TOTAL_DIFF=$(echo "$COMPARE_OUTPUT" | grep -oP 'Total Change.*?\*\*\K[^*]+' | head -1 || echo "0 tokens")
+          echo "diff=$TOTAL_DIFF" >> $GITHUB_OUTPUT
+
+      - name: Generate combined report
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          # Combine reports
+          echo "# 🔍 Token Analysis Report" > combined-report.md
+          echo "" >> combined-report.md
+
+          # Add comparison report first
+          if [ -f compare-report.md ]; then
+            cat compare-report.md >> combined-report.md
+            echo "" >> combined-report.md
+          fi
+
+          # Add limit check report
+          if [ -f limit-report.md ]; then
+            cat limit-report.md >> combined-report.md
+          fi
+
+          # Add to step summary
+          cat combined-report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload report artifact
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: token-analysis-report
+          path: combined-report.md
+          retention-days: 1
+
+      - name: Skip message
+        if: steps.changed-files.outputs.any_changed != 'true'
+        run: echo "No markdown files changed - skipping token analysis"
+
+  # Validate skill structure
+  skill-validation:
+    name: Skill Structure
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+      - name: Check changed skill files
+        id: changed-skills
+        uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
+        with:
+          files: |
+            plugin/skills/*/SKILL.md
+            .github/skills/*/SKILL.md
+
+      - name: Check all changed plugin skill files
+        id: changed-plugin-skills
+        uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
+        with:
+          files: |
+            plugin/skills/**
+            .github/skills/**
+
+      - name: Setup Node.js
+        if: steps.changed-plugin-skills.outputs.any_changed == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            scripts/package-lock.json
+
+      - name: Build output
+        if: steps.changed-plugin-skills.outputs.any_changed == 'true'
+        run: npm ci --ignore-scripts && npm run build
+
+      - name: Install scripts dependencies
+        if: steps.changed-plugin-skills.outputs.any_changed == 'true'
+        working-directory: ./scripts
+        run: npm ci --ignore-scripts
+
+      - name: Verify build output versions
+        if: steps.changed-plugin-skills.outputs.any_changed == 'true'
+        working-directory: ./scripts
+        run: npm run verifyBuildOutputVersions
+
+      - name: Validate skill frontmatter
+        if: steps.changed-skills.outputs.any_changed == 'true'
+        working-directory: ./scripts
+        env:
+          CHANGED_FILES: ${{ steps.changed-skills.outputs.all_changed_files }}
+        run: |
+          echo "## Skill Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Map changed plugin/skills paths to built output/skills paths so we
+          # validate the version-stamped copies. .github/skills are unchanged.
+          SKILL_FILES=""
+          for file in $CHANGED_FILES; do
+            if echo "$file" | grep -q '^plugin/skills/'; then
+              mapped=$(echo "$file" | sed 's|^plugin/skills/|output/skills/|')
+              SKILL_FILES="$SKILL_FILES ../$mapped"
+            else
+              SKILL_FILES="$SKILL_FILES ../$file"
+            fi
+          done
+          
+          # Run frontmatter spec validation
+          if OUTPUT=$(npm run frontmatter -- $SKILL_FILES 2>&1); then
+            echo "$OUTPUT"
+            echo "✅ All skill frontmatter is valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "$OUTPUT"
+            echo "❌ Frontmatter validation failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Validate skills.json
+        if: steps.changed-plugin-skills.outputs.any_changed == 'true'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Get all skill directories from the built output
+            const skillsDir = 'output/skills';
+            const skillDirs = fs.readdirSync(skillsDir)
+                .filter(f => fs.statSync(path.join(skillsDir, f)).isDirectory())
+                .sort();
+
+            // Read skills.json
+            const skillsJson = JSON.parse(fs.readFileSync('tests/skills.json', 'utf8'));
+            const jsonSkills = [...skillsJson.skills].sort();
+
+            let hasError = false;
+
+            // 1. skills.json enumerates all skills 
+            const skillDirsStr = JSON.stringify(skillDirs);
+            const jsonSkillsStr = JSON.stringify(jsonSkills);
+            if (skillDirsStr !== jsonSkillsStr) {
+                console.log();
+                console.log("skills in skills.json doesn't match available skills in output/skills/");
+                hasError = true;
+            }
+
+            // 2. Integration test schedule coverages all skills
+            let scheduledSkills = [];
+            Object.values(skillsJson.integrationTestSchedule).forEach(value => {
+                if (value) {
+                    value.split(',').forEach(s => scheduledSkills.push(s));
+                }
+            });
+
+            scheduledSkills = scheduledSkills.sort();
+
+            const scheduledSkillsStr = JSON.stringify(scheduledSkills);
+            if (skillDirsStr !== scheduledSkillsStr) {
+                console.log("skillDirs", JSON.stringify(skillDirs));
+                console.log("scheduledSkills", JSON.stringify(scheduledSkills));
+                console.log("integrationTestSchedule in skills.json doesn't match available skills in output/skills/");
+                hasError = true;
+            }
+
+            if (hasError) {
+                core.setFailed('tests/skills.json validation failed');
+            }
+
+      - name: Skip message
+        if: steps.changed-plugin-skills.outputs.any_changed != 'true'
+        run: echo "No skill files changed - skipping validation"
+
+  # Validate markdown references
+  reference-check:
+    name: Markdown References
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Check changed skill markdown files
+        id: changed-markdown
+        uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
+        with:
+          files: |
+            plugin/skills/**/*.md
+
+      - name: Setup Node.js
+        if: steps.changed-markdown.outputs.any_changed == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            scripts/package-lock.json
+
+      - name: Build output
+        if: steps.changed-markdown.outputs.any_changed == 'true'
+        run: npm ci --ignore-scripts && npm run build
+
+      - name: Install scripts dependencies
+        if: steps.changed-markdown.outputs.any_changed == 'true'
+        working-directory: ./scripts
+        run: npm ci --ignore-scripts
+
+      - name: Validate markdown references
+        if: steps.changed-markdown.outputs.any_changed == 'true'
+        working-directory: ./scripts
+        run: |
+          echo "## Markdown Reference Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          VALIDATION_FAILED=0
+
+          # Validate built plugin skill output so version-stamped files are checked
+          echo "Validating references in ../output/skills"
+          if OUTPUT=$(npm run references -- --skills-dir ../output/skills 2>&1); then
+            echo "$OUTPUT"
+            echo "✅ output/skills references are valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "$OUTPUT"
+            echo "❌ output/skills contains broken or escaped markdown references" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            VALIDATION_FAILED=1
+          fi
+
+          if [ "$VALIDATION_FAILED" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Skip message
+        if: steps.changed-markdown.outputs.any_changed != 'true'
+        run: echo "No skill markdown files changed - skipping reference check"

@@ -1,0 +1,1475 @@
+import { assert, commandMatcher, type Case, type CommandMatcher } from 'skillgym';
+
+type SessionReport = Parameters<typeof assert.skills.has>[0];
+type AssertionContext = Parameters<Case['assert']>[1];
+type OutputMatcher = string | RegExp | PlannedCommandMatcher;
+
+interface PlannedCommandMatcher {
+  kind: 'planned-command';
+  matchers: CommandMatcher[];
+}
+
+const WORKSPACE_ROOT = process.cwd().replaceAll('\\', '/');
+const APP_SOURCE = workspacePathPattern('examples/test-app', 'directory');
+const REPO_SOURCE = workspacePathPattern('src', 'directory');
+const COMMAND_DOCS = workspacePathPattern('website/docs/docs/commands.md', 'file');
+const SUITE_FILE = workspacePathPattern('test/skillgym/suites/agent-device-smoke-suite.ts', 'file');
+
+const BASE_INSTRUCTIONS = `
+You are benchmarking agent-device command planning for a known fixture app.
+
+Do not read project source files or project docs.
+Do not inspect examples/test-app, src/, README.md, or website/docs.
+Do not browse the web.
+Use only this prompt plus local CLI help as private reference.
+For local CLI help in this repo, use node bin/agent-device.mjs help or --help; final commands still use agent-device.
+Final output: only agent-device commands, one per line. Any prose or Markdown fails.
+`.trim();
+
+function workspacePathPattern(relativePath: string, kind: 'directory' | 'file') {
+  const normalizedPath = relativePath.replaceAll('\\', '/').replace(/^\.\//, '');
+  const escapedRoot = escapeRegExp(WORKSPACE_ROOT);
+  const escapedRelativePath = escapeRegExp(normalizedPath);
+  const boundary = kind === 'directory' ? '(?:/|$)' : '$';
+  return new RegExp(`^(?:${escapedRelativePath}|${escapedRoot}/${escapedRelativePath})${boundary}`);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildPrompt(options: { contract: string[]; task: string }) {
+  const contractLines = options.contract.map((line) => `- ${line}`).join('\n');
+  return `${BASE_INSTRUCTIONS}\n\nApp contract:\n${contractLines}\n\nTask:\n${options.task}`;
+}
+
+function assertAgentDeviceEvidence(report: SessionReport) {
+  const detectedSkills = report.detectedSkills ?? [];
+  const hasDetectedSkills = detectedSkills.length > 0;
+  const hasBundledDeviceSkill = detectedSkills.some((skill) =>
+    ['agent-device', 'dogfood'].includes(skill.skill),
+  );
+
+  // Some SkillGym runners do not expose skill telemetry. Keep this as a conditional routing
+  // assertion instead of failing otherwise valid command-planning runs on missing metadata.
+  if (hasDetectedSkills) {
+    assert.soft.ok(
+      hasBundledDeviceSkill,
+      `Expected detectedSkills to include an agent-device bundled skill. Observed detectedSkills: ${detectedSkills
+        .map((skill) => `${skill.skill} (${skill.confidence})`)
+        .join(', ')}`,
+    );
+  }
+}
+
+function assertNoProjectSourceReads(report: SessionReport) {
+  assert.soft.fileReads.notIncludes(report, APP_SOURCE, {
+    explain: { question: 'Why did you read the fixture app source instead of using CLI help?' },
+  });
+  assert.soft.fileReads.notIncludes(report, REPO_SOURCE, {
+    explain: { question: 'Why did you read repo source files instead of using CLI help?' },
+  });
+  assert.soft.fileReads.notIncludes(report, COMMAND_DOCS, {
+    explain: { question: 'Why did you read website command docs instead of local CLI help?' },
+  });
+}
+
+function plannedCommand(command: string): PlannedCommandMatcher {
+  return plannedCommandAlternatives([command]);
+}
+
+function plannedCommandAlternatives(commands: string[]): PlannedCommandMatcher {
+  return {
+    kind: 'planned-command',
+    matchers: commands.flatMap((command) => {
+      const [executable, ...args] = commandParts(command);
+      assert.ok(executable, 'planned command must not be empty');
+
+      return [
+        commandMatcher('agent-device').args(executable, ...args),
+        commandMatcher(executable).args(...args),
+      ];
+    }),
+  };
+}
+
+function assertOutputs(finalOutput: string, matchers: OutputMatcher[]) {
+  const output = normalizedFinalOutput(finalOutput);
+  const plannedReport = plannedCommandReport(output);
+  for (const matcher of matchers) {
+    if (isPlannedCommandMatcher(matcher)) {
+      assertPlannedCommandIncludes(plannedReport, matcher);
+      continue;
+    }
+
+    assert.output.includes(normalizedOutputReport(output), matcher);
+  }
+}
+
+function assertNoOutputs(finalOutput: string, matchers: OutputMatcher[]) {
+  const output = normalizedFinalOutput(finalOutput);
+  const plannedReport = plannedCommandReport(output);
+  for (const matcher of matchers) {
+    if (isPlannedCommandMatcher(matcher)) {
+      assertPlannedCommandNotIncludes(plannedReport, matcher);
+      continue;
+    }
+
+    if (typeof matcher === 'string') {
+      assert.ok(
+        !output.includes(matcher),
+        `Expected final output not to include ${JSON.stringify(matcher)}. Observed final output: ${finalOutput}`,
+      );
+      continue;
+    }
+
+    assert.doesNotMatch(output, matcher);
+  }
+}
+
+function isPlannedCommandMatcher(matcher: OutputMatcher): matcher is PlannedCommandMatcher {
+  return (
+    typeof matcher === 'object' &&
+    !(matcher instanceof RegExp) &&
+    matcher.kind === 'planned-command'
+  );
+}
+
+function assertPlannedCommandIncludes(report: SessionReport, matcher: PlannedCommandMatcher) {
+  if (matcher.matchers.length === 1) {
+    assert.commands.includes(report, matcher.matchers[0]!);
+    return;
+  }
+
+  const failures: Error[] = [];
+  for (const command of matcher.matchers) {
+    try {
+      assert.commands.includes(report, command);
+      return;
+    } catch (error) {
+      failures.push(error as Error);
+    }
+  }
+
+  assert.fail(failures.map((error) => error.message).join('\n'));
+}
+
+function assertPlannedCommandNotIncludes(report: SessionReport, matcher: PlannedCommandMatcher) {
+  for (const command of matcher.matchers) {
+    assert.commands.notIncludes(report, command);
+  }
+}
+
+function normalizedFinalOutput(output: string): string {
+  return output
+    .replace(/```[a-z]*\n?/gi, '')
+    .replace(/```/g, '')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .trim();
+}
+
+function plannedCommandReport(output: string): SessionReport {
+  return {
+    events: output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((command) => ({ type: 'command' as const, command })),
+  } as SessionReport;
+}
+
+function normalizedOutputReport(output: string): SessionReport {
+  return { finalOutput: output } as SessionReport;
+}
+
+function commandParts(command: string): string[] {
+  return command.split(' ').filter(Boolean);
+}
+
+function assertExpectedOutput(
+  report: SessionReport,
+  ctx: AssertionContext,
+  matchers: OutputMatcher[] = [],
+) {
+  if (matchers.length === 0) {
+    assert.output.notEmpty(report);
+    return;
+  }
+
+  assertOutputs(ctx.finalOutput(), matchers);
+}
+
+const RAW_COORDINATE_TARGET =
+  /(?:^|\n)(?:agent-device\s+)?(?:click|fill|press)\s+-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?/i;
+const PSEUDO_ASSERTION_COMMAND = /(?:^|\n)\s*(?:assert|assertVisible|waitFor|waitForText)\b/i;
+const COMPACT_RECT_SNAPSHOT = /snapshot\b(?=[^\n]*(?:-c\b|--compact\b))(?=[^\n]*(?:--json|--raw))/i;
+const IOS_EXPO_GO_OPEN =
+  /(?:^|\n)(?:agent-device\s+)?open\s+["']Expo Go["']\s+["']?exp:\/\/127\.0\.0\.1:8081["']?/i;
+
+function makeCase(options: {
+  id: string;
+  contract: string[];
+  task: string;
+  tags?: string[];
+  outputs?: OutputMatcher[];
+  forbiddenOutputs?: OutputMatcher[];
+}): Case {
+  return {
+    id: options.id,
+    tags: options.tags,
+    prompt: buildPrompt({ contract: options.contract, task: options.task }),
+    assert(report, ctx) {
+      assertAgentDeviceEvidence(report);
+      assertNoProjectSourceReads(report);
+      assert.soft.fileReads.notIncludes(report, SUITE_FILE, {
+        explain: { question: 'Why did you inspect the benchmark suite while answering?' },
+      });
+      assertExpectedOutput(report, ctx, options.outputs);
+      assertNoOutputs(ctx.finalOutput(), options.forbiddenOutputs ?? []);
+    },
+  };
+}
+
+function withTags(tags: string[], cases: Case[]): Case[] {
+  return cases.map((testCase) => ({
+    ...testCase,
+    tags: [...new Set([...(testCase.tags ?? []), ...tags])],
+  }));
+}
+
+const FIXTURE_SMOKE_CASES: Case[] = [
+  makeCase({
+    id: 'open-and-snapshot',
+    contract: [
+      'App name: Agent Device Tester',
+      'Platform: iOS',
+      'Launch context: Expo Go',
+      'Project URL: exp://127.0.0.1:8081',
+    ],
+    task: 'Plan the commands to open Agent Device Tester in Expo Go on iOS, take a snapshot -i to verify the app UI loaded, then close.',
+    outputs: [IOS_EXPO_GO_OPEN, /snapshot -i/i, plannedCommand('close')],
+  }),
+  makeCase({
+    id: 'home-dismiss-notice',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'testID=dismiss-notice',
+      'visible text: Release notice',
+    ],
+    task: 'Assume Agent Device Tester is already open on the Home tab. Plan the commands to dismiss the Release notice using the dismiss-notice testID, verify it is gone with diff snapshot -i, then close.',
+    outputs: [
+      /dismiss-notice/i,
+      /(?:diff snapshot -i|snapshot\b.*(?:-i\b.*--diff|--diff\b.*-i\b))/i,
+      plannedCommand('close'),
+    ],
+  }),
+  makeCase({
+    id: 'home-confirm-alert',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'testID=home-open-modal',
+      'Opening it shows a native confirmation alert',
+      'Home tab selector: label="Home"',
+    ],
+    task: 'Assume Agent Device Tester is already open on the Home tab. Plan the commands to open the confirmation alert, dismiss it using alert wait + alert dismiss, then verify the app is still on Home.',
+    outputs: [
+      /home-open-modal/i,
+      plannedCommand('alert wait'),
+      plannedCommand('alert dismiss'),
+      /label=(?:["']Home["']|Home)/i,
+    ],
+  }),
+  makeCase({
+    id: 'home-refresh-metrics',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'testID=refresh-metrics',
+      'visible loading text: Refreshing metrics...',
+    ],
+    task: 'Assume Agent Device Tester is already open on Home. Plan the commands to tap Refresh metrics, wait for "Refreshing metrics..." to appear, then verify the loading state is gone.',
+    outputs: [/refresh-metrics/i, plannedCommand('wait'), /Refreshing metrics/i],
+  }),
+  makeCase({
+    id: 'home-toggle-online',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'testID=toggle-online',
+      'visible badge text after disabling: Offline',
+    ],
+    task: 'Assume Agent Device Tester is open on Home. Plan the commands to toggle Lab online off and verify the Offline badge is visible.',
+    outputs: [/toggle-online/i, /Offline/i],
+  }),
+  makeCase({
+    id: 'catalog-search-debounce',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'testID=catalog-search',
+      'Search should respect debounce timing',
+    ],
+    task: 'Assume Agent Device Tester is on the Catalog tab. Plan the commands to fill the search field with "tart" using --delay-ms to respect the debounce, then wait for results to update.',
+    outputs: [/catalog-search/i, /--delay-ms/i, plannedCommand('wait')],
+  }),
+  makeCase({
+    id: 'catalog-filter-bakery',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'category chip: category-bakery',
+      'visible product after filtering: Berry Tart',
+    ],
+    task: 'Assume Agent Device Tester is on the Catalog tab. Plan the commands to select the Bakery category and verify Berry Tart is visible.',
+    outputs: [/(?:category-bakery|Bakery)/i, /Berry Tart/i],
+  }),
+  makeCase({
+    id: 'catalog-favorite-toggle',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'testID=favorite-citrus-kit',
+      'label after toggling favorite: Saved',
+    ],
+    task: 'Assume Agent Device Tester is on the Catalog tab. Plan the commands to toggle favorite for Citrus Starter Kit and verify the label changes to Saved.',
+    outputs: [/favorite-citrus-kit/i, /Saved/i],
+  }),
+  makeCase({
+    id: 'catalog-add-to-cart',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'testID=add-pepper-mix',
+      'visible text after add: In cart: 1',
+    ],
+    task: 'Assume Agent Device Tester is on the Catalog tab. Plan the commands to add Pepper Mix to the cart and verify the card shows In cart: 1.',
+    outputs: [/add-pepper-mix/i, /In cart: 1/i],
+  }),
+  makeCase({
+    id: 'catalog-scroll-footer',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'testID=catalog-footer',
+      'footer visible text: Seasonal footer target',
+    ],
+    task: 'Assume Agent Device Tester is on the Catalog tab. Plan the commands to scroll to the Seasonal footer target card using the scroll command.',
+    outputs: [plannedCommand('scroll'), /(?:catalog-footer|Seasonal footer|down)/i],
+    forbiddenOutputs: [/scrollintoview/i],
+  }),
+  makeCase({
+    id: 'product-open-details',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'testID=details-citrus-kit',
+      'Product detail screen has testID=product-title',
+    ],
+    task: 'Assume Agent Device Tester is on the Catalog tab. Plan the commands to open Citrus Starter Kit details and verify the product title is visible.',
+    outputs: [/details-citrus-kit/i, /product-title/i],
+  }),
+  makeCase({
+    id: 'product-quantity',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: product detail',
+      'testID=quantity-increase',
+      'testID=quantity-decrease',
+      'testID=quantity-value',
+    ],
+    task: 'Assume Agent Device Tester is already on a product detail screen. Plan the commands to increase quantity once, decrease it once, and get the quantity value through the durable quantity-value id rather than ambiguous visible number text.',
+    outputs: [
+      /quantity-increase/i,
+      /quantity-decrease/i,
+      plannedCommand('get text'),
+      /id=(?:["']quantity-value["']|quantity-value)/i,
+    ],
+    forbiddenOutputs: [/get text ['"]?2['"]?/i, /wait text ['"]?2['"]?/i, /label=["']2["']/i],
+  }),
+  makeCase({
+    id: 'product-note-append',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: product detail',
+      'testID=product-note',
+      'Use append semantics rather than replacement',
+    ],
+    task: 'Assume Agent Device Tester is already on a product detail screen. Plan the commands to append "Handle with care" to the product note using press + type (not fill).',
+    outputs: [/product-note/i, plannedCommand('press'), plannedCommand('type')],
+    forbiddenOutputs: [plannedCommand('fill'), /(?:^|\n)(?:agent-device\s+)?type\s+@/i],
+  }),
+  makeCase({
+    id: 'product-save-to-cart',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: product detail',
+      'testID=product-save',
+      'toast text after saving: Cart updated',
+    ],
+    task: 'Assume Agent Device Tester is already on a product detail screen. Plan the commands to press Save to cart and verify the Cart updated toast appears.',
+    outputs: [/product-save/i, /Cart updated/i],
+  }),
+  makeCase({
+    id: 'form-validation-errors',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Checkout form tab',
+      'testID=submit-order',
+      'validation errors card uses testID=form-errors',
+    ],
+    task: 'Assume Agent Device Tester is on the Checkout form tab. Plan the commands to submit with empty fields and verify the validation errors card is visible.',
+    outputs: [/submit-order/i, /form-errors/i],
+  }),
+  makeCase({
+    id: 'form-success-submit',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Checkout form tab',
+      'testID=field-name',
+      'testID=field-email',
+      'testID=checkbox-agree',
+      'success card uses testID=form-success',
+    ],
+    task: 'Assume Agent Device Tester is on the Checkout form tab. Plan the commands to fill name and email, check order confirmation, submit, and verify the Order summary card is visible.',
+    outputs: [/field-name/i, /field-email/i, /checkbox-agree/i, /form-success/i],
+  }),
+  makeCase({
+    id: 'form-keyboard-dismiss-ios-fallback',
+    contract: [
+      'App name: Agent Device Tester',
+      'Platform: iOS simulator',
+      'Current screen: Checkout form tab',
+      'testID=field-name',
+      'keyboard dismiss already returned UNSUPPORTED_OPERATION',
+      'visible app keyboard close control: Done',
+    ],
+    task: 'Assume Agent Device Tester is on the Checkout form tab. Plan the fallback commands to focus the Full name field, close the iOS keyboard through the visible app control, and verify the field remains visible.',
+    outputs: [/field-name/i, /Done/i, plannedCommandAlternatives(['press', 'click'])],
+    forbiddenOutputs: [plannedCommand('keyboard dismiss'), plannedCommand('back')],
+  }),
+  makeCase({
+    id: 'form-keyboard-dismiss-ios-done-control',
+    contract: [
+      'Platform: iOS',
+      'App name: Agent Device Tester',
+      'Current screen: Checkout form tab',
+      'testID=field-name',
+      'The focused field shows an iOS keyboard toolbar with a visible Done control',
+    ],
+    task: 'Plan the commands to focus the Full name field and dismiss the iOS keyboard without manually pressing Done.',
+    outputs: [/field-name/i, /keyboard dismiss/i],
+    forbiddenOutputs: [plannedCommand('back'), /press\s+.*Done/i, /click\s+.*Done/i],
+  }),
+  makeCase({
+    id: 'form-reset',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Checkout form tab',
+      'testID=reset-form',
+      'Full name field can be checked through id="field-name" or id="full-name"',
+      'Validation errors can be checked through id="form-errors", id="full-name-error", or visible text "Required"',
+      'toast text after reset: Form cleared',
+    ],
+    task: 'Assume Agent Device Tester is on the Checkout form tab after validation errors. Plan the commands to press Reset form, verify the Form cleared toast appears, verify validation errors are hidden, and verify the Full name field state is cleared.',
+    outputs: [
+      /reset-form/i,
+      /Form cleared/i,
+      /(?:form-errors|full-name-error|Required)/i,
+      /(?:field-name|full-name)/i,
+    ],
+  }),
+  makeCase({
+    id: 'settings-toggle-preferences',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Settings tab',
+      'testID=toggle-notifications',
+      'testID=toggle-reduced-motion',
+    ],
+    task: 'Assume Agent Device Tester is on the Settings tab. Plan the commands to toggle Push notifications and Reduced motion.',
+    outputs: [/toggle-notifications/i, /toggle-reduced-motion/i],
+  }),
+  makeCase({
+    id: 'settings-diagnostics-error',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Settings tab',
+      'testID=load-diagnostics',
+      'error panel uses testID=diagnostics-error',
+    ],
+    task: 'Assume Agent Device Tester is on the Settings tab. Plan the commands to load diagnostics, wait for the error state, and verify the diagnostics error panel is visible.',
+    outputs: [/load-diagnostics/i, /diagnostics-error/i],
+  }),
+  makeCase({
+    id: 'settings-diagnostics-retry',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Settings tab',
+      'testID=load-diagnostics',
+      'testID=retry-diagnostics',
+      'ready state uses testID=diagnostics-ready',
+    ],
+    task: 'Assume Agent Device Tester is on the Settings tab. Plan the commands to load diagnostics, wait for the error state, retry diagnostics, then verify the Ready badge is visible.',
+    outputs: [/load-diagnostics/i, /retry-diagnostics/i, /diagnostics-ready/i],
+  }),
+  makeCase({
+    id: 'settings-reset-alert',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Settings tab',
+      'testID=reset-lab',
+      'native alert title: Reset Agent Device Tester?',
+    ],
+    task: 'Assume Agent Device Tester is on the Settings tab. Plan the commands to trigger Reset lab state, then accept the native alert using alert wait + alert accept.',
+    outputs: [/reset-lab/i, plannedCommand('alert wait'), plannedCommand('alert accept')],
+  }),
+  makeCase({
+    id: 'home-accessibility-audit',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'Compare visible UI with the accessibility tree',
+    ],
+    task: 'Assume Agent Device Tester is on Home. Plan the commands to capture a screenshot and a snapshot to compare visible UI vs accessibility tree.',
+    outputs: [/screenshot/i, /snapshot/i],
+  }),
+];
+
+const SKILL_GUIDANCE_CASES: Case[] = [
+  makeCase({
+    id: 'inspect-visible-text-readonly',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'visible status badge text: Online',
+      'No interaction is needed to answer this task',
+    ],
+    task: 'Plan the minimal read-only command to verify whether the Online badge is visible. Do not request interactive refs or mutate the UI.',
+    outputs: [/(?:^|\n)(?:agent-device\s+)?(?:snapshot|is|find)(?:\s|$)/i, /Online/i],
+    forbiddenOutputs: [
+      /snapshot -i/i,
+      plannedCommand('click'),
+      plannedCommand('fill'),
+      plannedCommand('press'),
+    ],
+  }),
+  makeCase({
+    id: 'target-ref-after-interactive-snapshot',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'The target control has no stable selector in the task context',
+      'Fresh interactive snapshot will expose the target as @e12',
+    ],
+    task: 'Plan the commands to capture fresh interactive refs, press the target control with its @e12 ref, then verify the nearby change with diff snapshot -i.',
+    outputs: [
+      /snapshot -i/i,
+      /(?:^|\n)(?:agent-device\s+)?(?:click|press)\s+@e12\b/i,
+      /(?:diff snapshot -i|snapshot\b.*(?:-i\b.*--diff|--diff\b.*-i\b))/i,
+    ],
+    forbiddenOutputs: [RAW_COORDINATE_TARGET, /\btestID=/i],
+  }),
+  makeCase({
+    id: 'ios-disabled-row-raw-rect-fallback',
+    contract: [
+      'Platform: iOS simulator',
+      'Current screen: Orders list',
+      'Fresh interactive snapshot shows @e12 [disabled] hittable:false label "Order #1042"',
+      'press @e12 already returned success, but diff snapshot showed no navigation',
+      'Compact raw JSON rect center for @e12 is x=196 y=318',
+    ],
+    task: 'Plan the fallback commands to inspect raw compact snapshot rects, press the row center, then verify the nearby change.',
+    outputs: [
+      COMPACT_RECT_SNAPSHOT,
+      /(?:^|\n)(?:agent-device\s+)?(?:press|click)\s+196\s+318\b/i,
+      /(?:diff snapshot|snapshot\b.*--diff)/i,
+    ],
+    forbiddenOutputs: [/(?:^|\n)(?:agent-device\s+)?(?:press|click)\s+@e12\b/i, /scrollintoview/i],
+  }),
+  makeCase({
+    id: 'truncated-text-input-scope-ref',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Checkout form tab',
+      'Fresh interactive snapshot already shows @e7 [textinput] "Delivery instructions" [preview:"Leave at side gate..." truncated]',
+      'Need the full text value of that truncated input before deciding whether to edit it',
+    ],
+    task: 'Plan the command to expand the truncated Delivery instructions text input using the current @e7 ref.',
+    outputs: [
+      plannedCommand('snapshot'),
+      /(?:^|\n)(?:agent-device\s+)?snapshot\b.*(?:-s|--scope)\s+@e7\b/i,
+    ],
+    forbiddenOutputs: [
+      /snapshot --raw/i,
+      plannedCommand('get'),
+      plannedCommand('fill'),
+      plannedCommand('type'),
+      plannedCommand('press'),
+      RAW_COORDINATE_TARGET,
+    ],
+  }),
+  makeCase({
+    id: 'target-selector-for-durable-field',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'Durable selector: id="catalog-search"',
+      'Search should respect debounce timing',
+    ],
+    task: 'Plan the commands to fill the catalog search field through the durable id selector with "tart" using --delay-ms, then wait for results.',
+    outputs: [
+      plannedCommand('fill'),
+      /id=(?:["']catalog-search["']|catalog-search)/i,
+      /--delay-ms/i,
+      plannedCommand('wait'),
+    ],
+    forbiddenOutputs: [
+      RAW_COORDINATE_TARGET,
+      /(?:^|\n)(?:agent-device\s+)?type\s+@/i,
+      /--selector\b/i,
+      /--text\b/i,
+    ],
+  }),
+  makeCase({
+    id: 'text-replace-uses-fill',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Checkout form tab',
+      'Field selector: id="field-email"',
+      'Existing field value must be replaced',
+    ],
+    task: 'Plan the command to replace the Email field value with "qa@example.com".',
+    outputs: [
+      plannedCommand('fill'),
+      /id=(?:["']field-email["']|field-email)/i,
+      /qa@example\.com/i,
+    ],
+    forbiddenOutputs: [plannedCommand('type'), /(?:^|\n)(?:agent-device\s+)?fill\s+\d+\s+\d+/i],
+  }),
+  makeCase({
+    id: 'empty-fill-not-clear-field',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'Search field selector: id="catalog-search"',
+      'Visible clear control selector: id="clear-search"',
+      'Need to clear the existing search text',
+      'fill <target> "" is not supported',
+    ],
+    task: 'Plan the supported command to clear the search field without using empty fill replacement.',
+    outputs: [
+      /id=(?:["']clear-search["']|clear-search)/i,
+      plannedCommandAlternatives(['press', 'click']),
+    ],
+    forbiddenOutputs: [
+      /fill\b[^\n]*(?:id=["']catalog-search["']|catalog-search)[^\n]*(?:""|''|\s$)/i,
+      plannedCommand('type'),
+      /\bclear\s+field\b/i,
+    ],
+  }),
+  makeCase({
+    id: 'ios-allow-paste-prefill-only',
+    contract: [
+      'App name: Agent Device Tester',
+      'Platform: iOS simulator',
+      'App reads UIPasteboard.general when opened',
+      'iOS Allow Paste system prompt is suppressed under XCUITest automation',
+      'Need to test app behavior when pasteboard contains: some text',
+    ],
+    task: 'Plan commands to prefill the simulator pasteboard and open the app for paste-driven behavior. Do not try to automate the Allow Paste system dialog.',
+    outputs: [plannedCommand('clipboard'), /write/i, /some text/i, plannedCommand('open')],
+    forbiddenOutputs: [
+      /Allow Paste/i,
+      /alert (?:wait|accept|dismiss)/i,
+      /\bxcrun\b/i,
+      /\bsimctl\b/i,
+    ],
+  }),
+  makeCase({
+    id: 'android-non-ascii-text-stays-in-fill',
+    contract: [
+      'Platform: Android',
+      'Current screen: Checkout form tab',
+      'Field selector: id="field-name"',
+      'Desired value: Café ☕ 🎉',
+      'Some Android system images fail with direct platform-shell text injection',
+      'agent-device fill owns the non-ASCII fallback; do not use clipboard or paste',
+    ],
+    task: 'Plan only the robust agent-device command to fill the field with the provided non-ASCII value.',
+    outputs: [plannedCommand('fill'), /id=(?:["']field-name["']|field-name)/i, /Café ☕ 🎉/i],
+    forbiddenOutputs: [
+      plannedCommand('adb'),
+      plannedCommand('clipboard'),
+      /shell input text/i,
+      /\bpaste\b/i,
+      /\bime\b/i,
+      /ADBKeyBoard/i,
+    ],
+  }),
+  makeCase({
+    id: 'offscreen-target-scroll-resnapshot',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'Visible-first snapshot says [off-screen below] "Seasonal footer target"',
+      'Off-screen refs are discovery hints, not actionable refs',
+    ],
+    task: 'Plan the commands to reach the Seasonal footer target from the off-screen summary, then refresh interactive refs before acting or verifying.',
+    outputs: [plannedCommand('scroll'), /down/i, /snapshot -i/i],
+    forbiddenOutputs: [
+      /scrollintoview/i,
+      /(?:^|\n)(?:agent-device\s+)?(?:click|press)\s+@(?:e\d+|ref)/i,
+    ],
+  }),
+  makeCase({
+    id: 'ios-composite-horizontal-tabs-coordinate-fallback',
+    contract: [
+      'Platform: iOS simulator',
+      'Current screen: Catalog filters',
+      'Horizontal filter tabs are collapsed into one [seekbar] in snapshot -i',
+      'The individual Bakery tab has no @ref or selector on iOS',
+      'Compact raw JSON plus visual inspection gives Bakery center x=84 y=220',
+    ],
+    task: 'Plan commands to handle the missing child refs by inspecting raw compact rects, tapping the Bakery center, and verifying the selected filter changed.',
+    outputs: [
+      /(?:snapshot\b(?=[^\n]*(?:-c\b|--compact\b))(?=[^\n]*(?:--json|--raw))|snapshot\b.*-i)/i,
+      /(?:^|\n)(?:agent-device\s+(?:--platform\s+ios\s+)?)?(?:press|click)\s+84\s+220\b/i,
+      /(?:diff snapshot -i|snapshot\b.*(?:-i\b.*--diff|--diff\b.*-i\b)|snapshot\b.*-i|Berry Tart|Bakery)/i,
+    ],
+    forbiddenOutputs: [
+      /(?:^|\n)(?:agent-device\s+)?(?:press|click)\s+@(?:e\d+|ref)\b/i,
+      /scrollintoview/i,
+    ],
+  }),
+  makeCase({
+    id: 'list-text-presence-prefers-wait-text',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'List content loads asynchronously',
+      'Expected list item text: Trip ideas',
+      'No interaction is needed; this is a presence check for visible text in a list',
+    ],
+    task: 'Plan the robust read-only command to wait for the Trip ideas list text to appear.',
+    outputs: [plannedCommand('wait'), /Trip ideas/i],
+    forbiddenOutputs: [plannedCommand('is visible'), /snapshot -i/i, plannedCommand('press')],
+  }),
+  makeCase({
+    id: 'navigation-back-in-app',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: product detail',
+      'Goal: return to the Catalog tab through normal app navigation',
+      'No visible Catalog tab selector or nav-back selector is currently exposed',
+    ],
+    task: 'Plan the command to go back to Catalog using the app-owned back command.',
+    outputs: [plannedCommand('back')],
+    forbiddenOutputs: [/back\s+--system/i],
+  }),
+  makeCase({
+    id: 'navigation-back-ambiguous-use-visible-nav',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: nested product detail',
+      'Previous back command navigated to an unexpected screen',
+      'Visible app nav button selector: id="nav-back"',
+      'Goal: return one level inside the app, not trigger system back',
+    ],
+    task: 'Plan the next navigation command using the visible app-owned control instead of retrying back.',
+    outputs: [/nav-back/i, plannedCommandAlternatives(['press', 'click'])],
+    forbiddenOutputs: [plannedCommand('back'), /back\s+--system/i],
+  }),
+  makeCase({
+    id: 'setup-unknown-app-discover-first',
+    contract: [
+      'Platform: Android',
+      'Target app display name is known: Agent Device Tester',
+      'Package id is unknown',
+      'No app session is open yet',
+      'Session name: discovery',
+    ],
+    task: 'Plan the bootstrap commands to discover the correct Android device and app identifier, then open the discovered app in the named session.',
+    outputs: [
+      plannedCommand('devices'),
+      plannedCommand('apps'),
+      plannedCommand('open'),
+      /--session/i,
+    ],
+    forbiddenOutputs: [/com\.agent\.device\.tester/i, /com\.example/i],
+  }),
+  makeCase({
+    id: 'install-artifact-before-open',
+    contract: [
+      'Platform: Android',
+      'Known artifact path: ./dist/agent-device-tester.apk',
+      'Known package after install: com.callstack.agentdevicetester',
+      'The task requires installing the artifact',
+    ],
+    task: 'Plan the commands to install the APK artifact, then open the installed package in a fresh runtime state.',
+    outputs: [
+      plannedCommand('install'),
+      /\.\/dist\/agent-device-tester\.apk/i,
+      plannedCommand('open'),
+      /--relaunch/i,
+    ],
+    forbiddenOutputs: [/open\s+\.\/dist\/agent-device-tester\.apk/i],
+  }),
+  makeCase({
+    id: 'install-from-github-artifact-before-open',
+    contract: [
+      'Platform: Android',
+      'Install source: GitHub Actions artifact callstackincubator/agent-device:agent-device-tester-apk',
+      'Known package after install: com.callstack.agentdevicetester',
+      'Remote daemon can resolve the artifact server-side',
+    ],
+    task: 'Plan commands to install from the GitHub Actions artifact, then open the installed package in fresh runtime state.',
+    outputs: [
+      plannedCommand('install-from-source'),
+      /--github-actions-artifact\s+callstackincubator\/agent-device:agent-device-tester-apk/i,
+      plannedCommand('open'),
+      /com\.callstack\.agentdevicetester/i,
+      /--relaunch/i,
+    ],
+    forbiddenOutputs: [
+      /curl\b/i,
+      /gh\s+(?:run|artifact|download)/i,
+      /open\s+.*agent-device-tester-apk/i,
+    ],
+  }),
+  makeCase({
+    id: 'hidden-info-do-not-force-ui',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'Question: what is the hidden promo code?',
+      'The current screen does not expose any promo code text or selector',
+      'No interaction was requested',
+    ],
+    task: 'Plan the minimal read-only command to inspect exposed UI without typing, navigating, or mutating the app to reveal hidden information.',
+    outputs: [plannedCommand('snapshot')],
+    forbiddenOutputs: [
+      plannedCommand('press'),
+      plannedCommand('click'),
+      plannedCommand('fill'),
+      plannedCommand('type'),
+      plannedCommand('open'),
+    ],
+  }),
+  makeCase({
+    id: 'metro-reload-dev-loop',
+    contract: [
+      'App name: Agent Device Tester',
+      'React Native dev build is already open and connected to Metro',
+      'Only JavaScript changed',
+    ],
+    task: 'Plan the commands to reload the running app after the JS change, then verify the Home screen is visible.',
+    outputs: [
+      /(?:^|\n)(?:agent-device\s+)?metro\s+reload(?:\s|$)/i,
+      /(?:^|\n)(?:agent-device\s+)?(?:snapshot\b|find\b[^\n]*Home|is\b[^\n]*Home|wait\b[^\n]*Home)/i,
+    ],
+    forbiddenOutputs: [/open\b.*--relaunch/i, /(?:^|\n)(?:agent-device\s+)?screenshot\b/i],
+  }),
+  makeCase({
+    id: 'rn-warning-overlay-dismiss-before-tap',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen after opening will trigger console.warn',
+      'Fresh interactive snapshot should show the minimized React Native warning overlay',
+      'Overlay close control label: Dismiss',
+      'The warning overlay can obscure UI and intercept taps',
+      'Target selector after dismissing overlay: id="submit-order"',
+    ],
+    task: 'Plan commands to identify the warning overlay in snapshot -i, dismiss it, verify the overlay is gone with diff snapshot -i or a fresh snapshot -i, then press the submit target.',
+    outputs: [
+      /snapshot -i[\s\S]*(?:(?:press|click)\b[^\n]*(?:Dismiss|Close|warning)|find\b[^\n]*(?:Dismiss|Close|warning)[^\n]*(?:press|click))[\s\S]*(?:diff snapshot -i|snapshot\b.*-i)/i,
+      /submit-order/i,
+    ],
+    forbiddenOutputs: [
+      plannedCommand('screenshot'),
+      RAW_COORDINATE_TARGET,
+      /(?:^|\n)(?:agent-device\s+)?(?:press|click)\b[^\n]*submit-order[\s\S]*(?:Dismiss|Close)/i,
+      /alert accept/i,
+    ],
+  }),
+  makeCase({
+    id: 'rn-error-overlay-human-flag',
+    contract: [
+      'App name: Agent Device Tester',
+      'Platform: Android',
+      'Fresh interactive snapshot shows a React Native error overlay',
+      'Overlay controls include Dismiss and Reload JS',
+      'React DevTools is connected',
+      'The overlay is unrelated to the requested checkout task but should be reported',
+      'Checkout target selector after dismissing overlay: id="submit-order"',
+      'Need overlay screenshot evidence with refs before dismissing it',
+    ],
+    task: 'Plan commands to capture the error overlay using screenshot --overlay-refs, inspect React DevTools errors, dismiss only the unrelated overlay, re-snapshot, then continue to id="submit-order".',
+    outputs: [
+      /snapshot(?:\s+-i)?/i,
+      /screenshot\b[^\n]*--overlay-refs/i,
+      plannedCommand('react-devtools errors'),
+      /(?:(?:press|click)\b[^\n]*(?:Dismiss|Close)|find\b[^\n]*(?:Dismiss|Close)[^\n]*(?:press|click))/i,
+      /(?:diff snapshot -i|snapshot(?:\s+-i)?)/i,
+      /submit-order/i,
+    ],
+    forbiddenOutputs: [RAW_COORDINATE_TARGET, /alert accept/i, /ignore/i],
+  }),
+  makeCase({
+    id: 'expo-go-ios-project-url',
+    contract: [
+      'Platform: iOS simulator',
+      'Launch context: Expo Go',
+      'Project URL: exp://127.0.0.1:8081',
+      'The native bundle id for the project is not installed separately',
+      'The final command must include --platform ios',
+    ],
+    task: 'Plan the command to launch the Expo project in Expo Go on iOS without inventing a native bundle id.',
+    outputs: [IOS_EXPO_GO_OPEN, /--platform ios/i],
+    forbiddenOutputs: [
+      /open\s+Agent Device Tester/i,
+      /host\.exp\.Exponent/i,
+      /com\.(?:callstack|example|agent)/i,
+    ],
+  }),
+  makeCase({
+    id: 'expo-go-ios-runner-splash-retry-host-shell',
+    contract: [
+      'Platform: iOS simulator',
+      'Launch context: Expo Go',
+      'Project URL: exp://127.0.0.1:8081',
+      'Previous command open exp://127.0.0.1:8081 returned Opened',
+      'Fresh snapshot -i showed only the Agent Device Runner splash',
+      'Expo Go is available as a host shell',
+    ],
+    task: 'Plan the next commands to recover by opening the project through Expo Go and verifying the app UI loaded.',
+    outputs: [IOS_EXPO_GO_OPEN, /snapshot -i/i],
+    forbiddenOutputs: [
+      /open\s+Agent Device Runner/i,
+      /open\s+Agent Device Tester/i,
+      /com\.(?:callstack|example|agent)/i,
+      /host\.exp\.Exponent/i,
+    ],
+  }),
+  makeCase({
+    id: 'expo-go-ios-after-app-id-miss',
+    contract: [
+      'Platform: iOS simulator',
+      'Target app display name: Agent Device Tester',
+      'Previous apps lookup did not list Agent Device Tester',
+      'Previous apps lookup did list Expo Go',
+      'Project URL: exp://127.0.0.1:8081',
+    ],
+    task: 'Plan the next command to launch the project after the app-id lookup miss without inventing a native bundle id.',
+    outputs: [IOS_EXPO_GO_OPEN],
+    forbiddenOutputs: [
+      /open-url/i,
+      /open\s+Agent Device Tester/i,
+      /com\.(?:callstack|example|agent)/i,
+      /host\.exp\.Exponent/i,
+    ],
+  }),
+  makeCase({
+    id: 'expo-go-android-url-only',
+    contract: [
+      'Platform: Android',
+      'Launch context: Expo Go',
+      'Project URL: exp://10.0.2.2:8081',
+      'Android does not support open <app> <url>; use a URL target for deep links',
+    ],
+    task: 'Plan the command to launch the Expo project on Android using the project URL.',
+    outputs: [plannedCommand('open'), /exp:\/\/10\.0\.2\.2:8081/i, /--platform android/i],
+    forbiddenOutputs: [
+      /open\s+(?:"Expo Go"|Expo\s+Go)\s+exp:\/\//i,
+      /--activity/i,
+      /host\.exp\.exponent/i,
+    ],
+  }),
+  makeCase({
+    id: 'debug-logs-short-window',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Settings tab',
+      'Repro button selector: id="load-diagnostics"',
+      'Need app logs only for the retry failure window',
+    ],
+    task: 'Plan the commands to clear and restart logs, mark the repro window, trigger diagnostics, and inspect the log path without dumping a whole stale log into context.',
+    outputs: [/logs clear --restart/i, /logs mark/i, /load-diagnostics/i, /logs path/i],
+    forbiddenOutputs: [/cat .*log/i, /tail -n \+1/i],
+  }),
+  makeCase({
+    id: 'debug-network-session-dump',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Settings tab',
+      'Diagnostics load triggers HTTP traffic logged by the app',
+      'Repro button selector: id="load-diagnostics"',
+      'Need request and response headers',
+    ],
+    task: 'Plan the commands to reproduce the diagnostics request and inspect recent session network traffic with headers.',
+    outputs: [
+      /load-diagnostics/i,
+      plannedCommand('network'),
+      /(?:dump|log)/i,
+      /(?:--include\s+headers|\bheaders\b|network dump\b[^\n]*\ball\b)/i,
+    ],
+    forbiddenOutputs: [/logs path/i, /cat .*log/i],
+  }),
+  makeCase({
+    id: 'android-open-verify-ui',
+    contract: [
+      'App name: Agent Device Tester',
+      'Platform: Android',
+      'Package id: com.agentdevice.tester',
+      'Expected loaded text: Agent Device Tester',
+      'Need to verify the UI loaded after relaunch',
+    ],
+    task: 'Plan commands to open the Android package with a relaunch and verify the app UI loaded. Do not rely on screenshot-only verification.',
+    outputs: [
+      plannedCommand('open'),
+      /com\.agentdevice\.tester/i,
+      /--relaunch/i,
+      /(?:wait(?:\s+text)?|is visible|find)\b[^\n]*Agent Device Tester/i,
+    ],
+    forbiddenOutputs: [plannedCommand('screenshot')],
+  }),
+  makeCase({
+    id: 'android-action-sheet-document-scan-wait',
+    contract: [
+      'App name: Document Fixture',
+      'Platform: Android',
+      'Current screen: chat composer',
+      'Action sheet trigger selector: id="composer-actions"',
+      'Scan option text: Scan document',
+      'Expected result text after upload: Document uploaded',
+      'Android camera permission may appear as visible UI',
+    ],
+    task: 'Plan commands to open the composer action sheet, choose Scan document, handle any visible permission prompt, and wait for the upload result.',
+    outputs: [
+      /composer-actions/i,
+      /Scan document/i,
+      /Allow|snapshot -i/i,
+      /wait\b[^\n]*Document uploaded/i,
+    ],
+    forbiddenOutputs: [
+      RAW_COORDINATE_TARGET,
+      PSEUDO_ASSERTION_COMMAND,
+      /alert wait/i,
+      /settings permission/i,
+    ],
+  }),
+  makeCase({
+    id: 'evidence-screenshot-overlay-refs',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Catalog tab',
+      'The bug report needs visual proof and tappable-region context for icon-only controls',
+    ],
+    task: 'Plan the command to capture screenshot evidence with current interactive ref overlays.',
+    outputs: [plannedCommand('screenshot'), /--overlay-refs/i],
+    forbiddenOutputs: [/snapshot --raw/i],
+  }),
+  makeCase({
+    id: 'perf-session-metrics',
+    contract: [
+      'App name: Agent Device Tester',
+      'Platform: iOS simulator',
+      'No startup sample exists until the app is opened',
+      'Need session startup, memory, and CPU data as JSON',
+    ],
+    task: 'Plan the commands to open the app first if needed, then collect session performance metrics as JSON.',
+    outputs: [plannedCommand('open'), plannedCommandAlternatives(['perf', 'metrics']), /--json/i],
+    forbiddenOutputs: [plannedCommand('network')],
+  }),
+  makeCase({
+    id: 'react-devtools-profile-search',
+    contract: [
+      'App name: Agent Device Tester',
+      'React Native DevTools can connect to the running app',
+      'Interaction to profile: type in the Catalog search field',
+      'Search field selector: id="catalog-search"',
+      'Need slow components and rerender counts',
+    ],
+    task: 'Plan the commands to verify React DevTools is connected, profile the Catalog search interaction, then list slow components and rerenders.',
+    outputs: [
+      plannedCommandAlternatives(['react-devtools status', 'react-devtools start']),
+      plannedCommand('react-devtools wait'),
+      plannedCommand('react-devtools profile start'),
+      /catalog-search/i,
+      plannedCommand('react-devtools profile stop'),
+      plannedCommand('react-devtools profile slow'),
+      plannedCommand('react-devtools profile rerenders'),
+    ],
+    forbiddenOutputs: [plannedCommand('snapshot'), plannedCommand('perf')],
+  }),
+  makeCase({
+    id: 'react-devtools-exact-component-inspect',
+    contract: [
+      'App name: Agent Device Tester',
+      'React Native DevTools is connected',
+      'Need current props, state, and hooks for component SearchScreen',
+      'Fuzzy component search returns noisy matches unless exact matching is used',
+    ],
+    task: 'Plan bounded React DevTools commands to find the exact SearchScreen component and inspect it.',
+    outputs: [
+      plannedCommand('react-devtools find'),
+      /SearchScreen/i,
+      /--exact/i,
+      plannedCommand('react-devtools get component'),
+    ],
+    forbiddenOutputs: [plannedCommand('snapshot'), plannedCommand('perf')],
+  }),
+  makeCase({
+    id: 'react-devtools-render-cause-report',
+    contract: [
+      'App name: Agent Device Tester',
+      'React Native profile has already been stopped',
+      'Rerender suspect from profile output: @c12',
+      'Need render causes and changed props/state/hooks for that component',
+    ],
+    task: 'Plan the React DevTools command to inspect render causes for @c12.',
+    outputs: [plannedCommand('react-devtools profile report'), /@c12/i],
+    forbiddenOutputs: [
+      plannedCommand('snapshot'),
+      plannedCommand('perf'),
+      plannedCommand('react-devtools profile slow'),
+      plannedCommand('react-devtools profile rerenders'),
+    ],
+  }),
+  makeCase({
+    id: 'react-native-diagnostics-flow',
+    contract: [
+      'App name: Agent Device Tester',
+      'Platform: Android',
+      'Current screen: Settings tab',
+      'Slow interaction: load diagnostics from the Settings screen',
+      'Diagnostics trigger selector: id="load-diagnostics"',
+      'Expected async result selector: id="diagnostics-error"',
+      'The diagnostics request can take 5-10 seconds',
+      'Need React component offenders and network evidence',
+      'Before beginning the shared-device flow, run session list to discover/reuse any active session',
+      'Open Agent Device Tester on Android and take snapshot -i before interacting',
+    ],
+    task: 'Plan commands for a focused React Native performance run around the Settings diagnostics load flow, including debug markers, async verification, slow/rerender output, and network headers.',
+    outputs: [
+      plannedCommand('session list'),
+      plannedCommand('open'),
+      /snapshot -i/i,
+      /logs (?:clear --restart|start)/i,
+      /logs mark\b[^\n]*(?:before|start|begin)/i,
+      plannedCommand('react-devtools status'),
+      plannedCommand('react-devtools wait'),
+      plannedCommand('react-devtools profile start'),
+      /load-diagnostics/i,
+      /wait\b[^\n]*(?:diagnostics-error|Diagnostics error)/i,
+      /(?:5000|10000|12000|15000|20000)/i,
+      /logs mark\b[^\n]*(?:after|end|verified|diagnostics|loaded)/i,
+      plannedCommand('react-devtools profile stop'),
+      plannedCommand('react-devtools profile slow'),
+      plannedCommand('react-devtools profile rerenders'),
+      /network dump\b[^\n]*(?:--include headers|\bheaders\b|\ball\b)/i,
+    ],
+    forbiddenOutputs: [RAW_COORDINATE_TARGET, /cat .*log/i, /alert wait/i, /agent-devtools/i],
+  }),
+  makeCase({
+    id: 'gesture-swipe-carousel',
+    contract: [
+      'Platform: iOS simulator',
+      'Current screen: onboarding carousel',
+      'Need to advance and return across pages repeatedly',
+      'Gesture should use a swipe series, not scroll',
+      'Use one direct swipe command with --count and --pattern; do not use batch',
+    ],
+    task: 'Plan one direct gesture command to swipe horizontally across the carousel eight times with a 30ms pause and ping-pong pattern.',
+    outputs: [
+      plannedCommand('swipe'),
+      /--count\s+8/i,
+      /--pause-ms\s+30/i,
+      /--pattern\s+ping-pong/i,
+    ],
+    forbiddenOutputs: [plannedCommand('scroll'), plannedCommand('batch'), RAW_COORDINATE_TARGET],
+  }),
+  makeCase({
+    id: 'gesture-longpress-context-menu',
+    contract: [
+      'Platform: Android',
+      'Current screen: Catalog tab',
+      'Target center is x=300 y=500',
+      'Need to open a native context menu with an 800ms long press',
+    ],
+    task: 'Plan the gesture command to long-press the target center for 800ms.',
+    outputs: [plannedCommand('longpress'), /300\s+500\s+800/i],
+    forbiddenOutputs: [/--duration-ms/i, /--hold-ms/i, plannedCommand('click')],
+  }),
+  makeCase({
+    id: 'gesture-pinch-zoom',
+    contract: [
+      'Platform: iOS simulator',
+      'Current screen: image preview',
+      'Pinch is supported on Apple simulators',
+      'Need to zoom out around x=200 y=400',
+      'Zoom-out scale: 0.5',
+    ],
+    task: 'Plan the gesture command to pinch zoom out at the specified center.',
+    outputs: [plannedCommand('pinch'), /0\.5/i, /200\s+400/i],
+    forbiddenOutputs: [
+      /(?:^|\s)--scale(?!\w)/i,
+      /(?:^|\s)--x(?!\w)/i,
+      /(?:^|\s)--y(?!\w)/i,
+      plannedCommand('scroll'),
+      plannedCommand('swipe'),
+    ],
+  }),
+  makeCase({
+    id: 'settings-animation-stabilizer',
+    contract: [
+      'Platform: Android',
+      'App name: Agent Device Tester',
+      'Animations make this flow flaky',
+      'Animations should be restored after the check',
+    ],
+    task: 'Plan the commands to disable platform animations before the app check, run a snapshot, then restore animations.',
+    outputs: [/settings animations off/i, plannedCommand('snapshot'), /settings animations on/i],
+    forbiddenOutputs: [
+      /--platform macos/i,
+      /settings appearance/i,
+      /animations disable/i,
+      /animations restore/i,
+    ],
+  }),
+  makeCase({
+    id: 'trace-capture-session',
+    contract: [
+      'App name: Agent Device Tester',
+      'An app session is already open',
+      'Repro button selector: id="load-diagnostics"',
+      'Need low-level session diagnostics for one diagnostics-button repro',
+      'Trace artifact path: ./traces/diagnostics.trace',
+    ],
+    task: 'Plan the commands to start trace capture, trigger diagnostics, then stop the trace into the requested artifact path.',
+    outputs: [
+      /trace start \.\/traces\/diagnostics\.trace/i,
+      /load-diagnostics/i,
+      /trace stop \.\/traces\/diagnostics\.trace/i,
+    ],
+    forbiddenOutputs: [
+      plannedCommand('record'),
+      /logs clear --restart/i,
+      /trace (?:start|stop) --path/i,
+    ],
+  }),
+  makeCase({
+    id: 'alert-visible-ui-fallback',
+    contract: [
+      'App name: Agent Device Tester',
+      'Current screen: Home tab',
+      'A visible permission sheet contains the button text "Allow"',
+      'alert accept already returned no alert found',
+    ],
+    task: 'Plan the fallback commands to handle the visible sheet as normal tappable UI instead of looping on alert accept.',
+    outputs: [
+      /(?:^|\n)(?:agent-device\s+)?(?:find\b.*\bpress\b|(?:press|click)\b.*Allow|snapshot -i)/is,
+      /Allow/i,
+    ],
+    forbiddenOutputs: [/alert accept.*\n.*alert accept/is, RAW_COORDINATE_TARGET],
+  }),
+  makeCase({
+    id: 'android-keyboard-readonly-status',
+    contract: [
+      'Platform: Android',
+      'App name: Agent Device Tester',
+      'Current screen: Checkout form tab',
+      'Question: is the keyboard visible and what input type is active?',
+    ],
+    task: 'Plan the read-only command to inspect Android keyboard visibility and input type.',
+    outputs: [/(?:^|\n)(?:agent-device\s+)?keyboard(?:\s+(?:status|get))?(?:\s|$)/i],
+    forbiddenOutputs: [plannedCommand('fill'), plannedCommand('type'), /keyboard dismiss/i],
+  }),
+  makeCase({
+    id: 'android-fill-ime-capture-stop-retry-loop',
+    contract: [
+      'Platform: Android',
+      'App name: Agent Device Tester',
+      'Current screen: Checkout form tab',
+      'The Android IME capture fixture is visible: id="android-ime-capture-fixture"',
+      'The app field is still visible as targetInput id="field-ime-capture-target"',
+      'The last fill failed: Android fill input was captured by the active keyboard instead of the app field',
+      'Diagnostic details show actualInput packageName="com.google.android.inputmethod.latin" inputMethodOwned=true',
+    ],
+    task: 'Plan the next diagnostic step. Do not retry fill or type until the IME handwriting/stylus state has been corrected.',
+    outputs: [
+      /(?:^|\n)(?:agent-device\s+)?keyboard(?:\s+(?:status|get))?(?:\s|$)/i,
+      /(?:IME|keyboard|Gboard|handwriting|stylus)/i,
+    ],
+    forbiddenOutputs: [
+      plannedCommand('fill'),
+      plannedCommand('type'),
+      RAW_COORDINATE_TARGET,
+      /adb shell/i,
+    ],
+  }),
+  makeCase({
+    id: 'remote-cloud-connect-flow',
+    contract: [
+      'Cloud control plane owns the connection profile',
+      'No local remote config path was provided',
+      'App package: com.callstack.agentdevicetester',
+      'The cloud profile owns tenant, run, lease, and Metro hints',
+    ],
+    task: 'Plan a remote flow that discovers the cloud connection profile, opens the app, captures a snapshot, and disconnects cleanly.',
+    outputs: [
+      plannedCommand('connect'),
+      plannedCommand('open'),
+      plannedCommand('snapshot'),
+      plannedCommand('disconnect'),
+    ],
+    forbiddenOutputs: [
+      /--remote-config/i,
+      /--daemon-base-url/i,
+      /--tenant/i,
+      /--run-id/i,
+      plannedCommand('screenshot'),
+    ],
+  }),
+  makeCase({
+    id: 'remote-config-connect-flow',
+    contract: [
+      'Remote config path: ./remote-config.json',
+      'App package: com.callstack.agentdevicetester',
+      'The remote profile owns tenant, run, lease, and Metro hints',
+    ],
+    task: 'Plan a remote flow that connects through the remote config, opens the app, captures a snapshot, and disconnects cleanly.',
+    outputs: [
+      /connect --remote-config \.\/remote-config\.json/i,
+      plannedCommand('open'),
+      plannedCommand('snapshot'),
+      plannedCommand('disconnect'),
+    ],
+    forbiddenOutputs: [
+      /--daemon-base-url/i,
+      /--tenant/i,
+      /--run-id/i,
+      plannedCommand('screenshot'),
+    ],
+  }),
+  makeCase({
+    id: 'remote-config-script-flow',
+    contract: [
+      'Remote config path: ./remote-config.json',
+      'App package: com.callstack.agentdevicetester',
+      'This is a self-contained script where every command must be explicit',
+      'The remote profile owns tenant, run, lease, and Metro hints',
+    ],
+    task: 'Plan a self-contained remote script that opens the app, captures a snapshot, and disconnects using the remote config on every command.',
+    outputs: [
+      /(?:--remote-config\s+\.\/remote-config\.json[^\n]*open|open\b[^\n]*--remote-config\s+\.\/remote-config\.json)/i,
+      /(?:--remote-config\s+\.\/remote-config\.json[^\n]*snapshot|snapshot\b[^\n]*--remote-config\s+\.\/remote-config\.json)/i,
+      /(?:--remote-config\s+\.\/remote-config\.json[^\n]*disconnect|disconnect\b[^\n]*--remote-config\s+\.\/remote-config\.json)/i,
+    ],
+    forbiddenOutputs: [/--daemon-base-url/i, /--tenant/i, /--run-id/i],
+  }),
+  makeCase({
+    id: 'macos-menubar-surface',
+    contract: [
+      'Platform: macOS',
+      'App name: Agent Device Tester Menu',
+      'The app lives entirely as a menu bar extra',
+      'Normal app snapshots can be sparse or empty',
+      'Required flags: --platform macos --surface menubar',
+    ],
+    task: 'Plan the commands to inspect the menu bar app surface with --platform macos --surface menubar and capture interactive refs with snapshot -i.',
+    outputs: [/--platform macos/i, /--surface menubar/i, /snapshot\b.*(?:-i\b|\s-i\b)/i],
+    forbiddenOutputs: [/--surface app/i, /snapshot --raw/i],
+  }),
+  makeCase({
+    id: 'macos-context-menu-secondary-click',
+    contract: [
+      'Platform: macOS',
+      'Current surface: app',
+      'Target row current ref: @e66',
+      'Need to open its native context menu and inspect menu item refs',
+      'Required platform flag: --platform macos',
+    ],
+    task: 'Plan commands with --platform macos to open the context menu for @e66 and then refresh interactive refs for the menu items.',
+    outputs: [
+      plannedCommand('click'),
+      /@e66/i,
+      /--button\s+secondary/i,
+      /--platform\s+macos/i,
+      /snapshot\b.*-i/i,
+    ],
+    forbiddenOutputs: [plannedCommand('longpress'), RAW_COORDINATE_TARGET, /--surface menubar/i],
+  }),
+  makeCase({
+    id: 'replay-maintenance-update',
+    contract: [
+      'Replay path: ./replays/catalog-checkout.ad',
+      'Selectors drifted after a UI label change',
+      'Goal: maintain the replay script in place',
+    ],
+    task: 'Plan the command to maintain the existing replay script after selector drift.',
+    outputs: [plannedCommand('replay'), /-u|--update/i, /\.\/replays\/catalog-checkout\.ad/i],
+    forbiddenOutputs: [/sed\s+-i/i, /open .*\.ad/i],
+  }),
+  makeCase({
+    id: 'batch-known-stable-flow',
+    contract: [
+      'App name: Agent Device Tester',
+      'The full checkout flow is already known and stable',
+      'Known batch steps file: ./checkout-steps.json',
+      'Need fewer round trips while recording evidence',
+    ],
+    task: 'Plan the commands to start a recording, execute the known checkout steps from the provided steps file as one batch, and stop the recording.',
+    outputs: [
+      /(?:^|\n)(?:agent-device\s+)?record\s+start/i,
+      plannedCommand('batch'),
+      /(?:^|\n)(?:agent-device\s+)?record\s+stop/i,
+    ],
+    forbiddenOutputs: [PSEUDO_ASSERTION_COMMAND, /workflow batch/i, plannedCommand('trace')],
+  }),
+  makeCase({
+    id: 'same-session-mutations-serial',
+    contract: [
+      'Session: dogfood-test-app',
+      'Current screen: Checkout form tab',
+      'Name field selector: id="field-name"',
+      'Email field selector: id="field-email"',
+      'Submit button selector: id="submit-order"',
+      'Need to fill name, fill email, and press submit as three separate commands',
+      'All commands mutate the same active device session',
+      'Parallel same-session mutations can pollute focus and field state',
+      'Do not use batch for this case; demonstrate serial command ordering',
+    ],
+    task: 'Plan the three separate serial commands for this same-session form flow using the durable selectors.',
+    outputs: [/--session dogfood-test-app/i, /field-name/i, /field-email/i, /submit-order/i],
+    forbiddenOutputs: [
+      /Based on my/i,
+      /Let me/i,
+      /Promise\.all/i,
+      /(?:^|\n).*(?:fill|press).*(?:&|&&).*(?:fill|press)/i,
+      /parallel/i,
+      plannedCommand('batch'),
+    ],
+  }),
+  makeCase({
+    id: 'batch-inline-step-schema-positionals',
+    contract: [
+      'Need one inline batch command',
+      'Step 1: open settings',
+      'Step 2: wait 100 ms',
+      'Batch step schema supports command, positionals, flags, and runtime',
+      'The args field is invalid and must not be used',
+    ],
+    task: 'Plan the batch command with inline JSON steps using the supported step field for positional arguments.',
+    outputs: [plannedCommand('batch'), /--steps/i, /"positionals"\s*:/i, /"open"/i, /"wait"/i],
+    forbiddenOutputs: [/"args"\s*:/i, /workflow batch/i],
+  }),
+];
+
+const suite: Case[] = [
+  ...withTags(['fixture-smoke'], FIXTURE_SMOKE_CASES),
+  ...withTags(['skill-guidance'], SKILL_GUIDANCE_CASES),
+];
+
+export default suite;

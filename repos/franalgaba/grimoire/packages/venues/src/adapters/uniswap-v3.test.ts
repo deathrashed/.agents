@@ -1,0 +1,518 @@
+import { describe, expect, test } from "bun:test";
+import type { Address, Expression, Provider, VenueAdapterContext } from "@grimoirelabs/core";
+import { createUniswapV3Adapter } from "./uniswap-v3.js";
+
+/** Mock pool state: sqrtPriceX96 = 2^96 (price = 1 in raw units), tick = 0 */
+const MOCK_SLOT0 = [
+  79228162514264337593543950336n, // sqrtPriceX96
+  0n, // tick
+  0n, // observationIndex
+  0n, // observationCardinality
+  0n, // observationCardinalityNext
+  0n, // feeProtocol
+  true, // unlocked
+] as const;
+const MOCK_LIQUIDITY = 1_000_000_000_000_000_000n;
+
+const mockReadContract = async (params: { functionName: string }) => {
+  if (params.functionName === "slot0") return MOCK_SLOT0;
+  if (params.functionName === "liquidity") return MOCK_LIQUIDITY;
+  return 0n;
+};
+
+const provider = {
+  chainId: 1,
+  readContract: mockReadContract,
+  getClient: () => ({
+    readContract: async () => 0n, // 0 allowance → needs approval
+  }),
+} as unknown as Provider;
+
+const ctx: VenueAdapterContext = {
+  provider,
+  walletAddress: "0x0000000000000000000000000000000000000001" as Address,
+  chainId: 1,
+};
+
+describe("Uniswap V3 adapter", () => {
+  test("reads quote_out metric for pair + amount selector", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.readMetric) {
+      throw new Error("Adapter does not support readMetric");
+    }
+
+    const quoteOut = await adapter.readMetric(
+      {
+        surface: "quote_out",
+        venue: "uniswap_v3",
+        asset: "USDC",
+        selector: "asset_out=WETH,amount=1000000,fee_tier=3000",
+      },
+      ctx
+    );
+
+    expect(Number.isFinite(quoteOut)).toBe(true);
+    expect(quoteOut).toBeGreaterThan(0);
+  });
+
+  test("quote_out metric reflects fee tier", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.readMetric) {
+      throw new Error("Adapter does not support readMetric");
+    }
+
+    const lowFeeQuote = await adapter.readMetric(
+      {
+        surface: "quote_out",
+        venue: "uniswap_v3",
+        asset: "USDC",
+        selector: "asset_out=WETH,amount=1000000,fee_tier=500",
+      },
+      ctx
+    );
+    const highFeeQuote = await adapter.readMetric(
+      {
+        surface: "quote_out",
+        venue: "uniswap_v3",
+        asset: "USDC",
+        selector: "asset_out=WETH,amount=1000000,fee_tier=3000",
+      },
+      ctx
+    );
+
+    expect(lowFeeQuote).toBeGreaterThan(highFeeQuote);
+  });
+
+  test("adds approval before swap when allowance is insufficient", async () => {
+    const adapter = createUniswapV3Adapter();
+
+    if (!adapter.buildAction) {
+      throw new Error("Adapter does not support buildAction");
+    }
+
+    const amount: Expression = { kind: "literal", value: 10n, type: "int" };
+
+    const result = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "USDC",
+        assetOut: "WETH",
+        amount,
+        mode: "exact_in",
+        feeTier: 3000,
+      },
+      ctx
+    );
+
+    const built = Array.isArray(result) ? result : [result];
+
+    expect(built).toHaveLength(2);
+    expect(built[0]?.description).toContain("Approve USDC");
+    expect(built[1]?.description).toContain("Uniswap V3 swap");
+    expect(built[1]?.metadata?.quote?.expectedOut).toBeDefined();
+    expect(built[1]?.metadata?.route?.poolAddress).toBeDefined();
+  });
+
+  test("rejects swap without explicit fee_tier", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const amount: Expression = { kind: "literal", value: 10n, type: "int" };
+
+    await expect(
+      adapter.buildAction(
+        {
+          type: "swap",
+          venue: "uniswap_v3",
+          assetIn: "USDC",
+          assetOut: "WETH",
+          amount,
+          mode: "exact_in",
+        },
+        ctx
+      )
+    ).rejects.toThrow("requires explicit fee_tier");
+  });
+
+  test("fails fast on unsupported constraints", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const amount: Expression = { kind: "literal", value: 10n, type: "int" };
+
+    await expect(
+      adapter.buildAction(
+        {
+          type: "swap",
+          venue: "uniswap_v3",
+          assetIn: "USDC",
+          assetOut: "WETH",
+          amount,
+          mode: "exact_in",
+          constraints: {
+            maxPriceImpactBps: 10,
+          },
+        } as unknown as Parameters<NonNullable<typeof adapter.buildAction>>[0],
+        ctx
+      )
+    ).rejects.toThrow(
+      "Adapter 'uniswap_v3' does not support constraint 'max_price_impact' for action 'swap'"
+    );
+  });
+
+  test("skips approval when allowance is sufficient", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) {
+      throw new Error("Adapter does not support buildAction");
+    }
+
+    const richProvider = {
+      chainId: 1,
+      readContract: mockReadContract,
+      getClient: () => ({
+        readContract: async () => 1000000n, // high allowance
+      }),
+    } as unknown as Provider;
+
+    const richCtx: VenueAdapterContext = {
+      ...ctx,
+      provider: richProvider,
+    };
+
+    const amount: Expression = { kind: "literal", value: 10n, type: "int" };
+
+    const result = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "USDC",
+        assetOut: "WETH",
+        amount,
+        mode: "exact_in",
+        feeTier: 3000,
+      },
+      richCtx
+    );
+
+    const built = Array.isArray(result) ? result : [result];
+
+    expect(built).toHaveLength(1);
+    expect(built[0]?.description).toContain("Uniswap V3 swap");
+  });
+
+  test("rejects non-swap action types", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const action = {
+      type: "bridge",
+      venue: "uniswap_v3",
+      assetIn: "USDC",
+      assetOut: "WETH",
+      amount: 10n,
+      mode: "exact_in",
+    } as unknown as Parameters<NonNullable<typeof adapter.buildAction>>[0];
+
+    await expect(adapter.buildAction(action, ctx)).rejects.toThrow(
+      "Uniswap adapter only supports swap actions"
+    );
+  });
+
+  test("rejects unconfigured chain", async () => {
+    const adapter = createUniswapV3Adapter({ routers: {} });
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const amount: Expression = { kind: "literal", value: 10n, type: "int" };
+
+    await expect(
+      adapter.buildAction(
+        {
+          type: "swap",
+          venue: "uniswap_v3",
+          assetIn: "USDC",
+          assetOut: "WETH",
+          amount,
+          mode: "exact_in",
+          feeTier: 3000,
+        },
+        ctx
+      )
+    ).rejects.toThrow("No Uniswap router configured");
+  });
+
+  test("builds exact_out swap with amountInMaximum", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const result = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "USDC",
+        assetOut: "WETH",
+        amount: 10n as unknown as Expression,
+        mode: "exact_out",
+        feeTier: 3000,
+      },
+      ctx
+    );
+
+    const built = Array.isArray(result) ? result : [result];
+    const swapTx = built[built.length - 1];
+
+    expect(swapTx?.description).toContain("Uniswap V3 swap");
+    expect(swapTx?.tx.data).toBeDefined();
+  });
+
+  test("resolves direct 0x address for token", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const result = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        assetOut: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        amount: 10n as unknown as Expression,
+        mode: "exact_in",
+        feeTier: 3000,
+      },
+      ctx
+    );
+
+    const built = Array.isArray(result) ? result : [result];
+    expect(built[built.length - 1]?.description).toContain("Uniswap V3 swap");
+  });
+
+  test("rejects unknown asset symbol", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    await expect(
+      adapter.buildAction(
+        {
+          type: "swap",
+          venue: "uniswap_v3",
+          assetIn: "UNKNOWN",
+          assetOut: "WETH",
+          amount: 10n as unknown as Expression,
+          mode: "exact_in",
+          feeTier: 3000,
+        },
+        ctx
+      )
+    ).rejects.toThrow("Unknown asset");
+  });
+
+  test("handles various amount types and rejects unsupported", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    // number amount
+    const numResult = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "USDC",
+        assetOut: "WETH",
+        amount: 10 as unknown as Expression,
+        mode: "exact_in",
+        feeTier: 3000,
+      },
+      ctx
+    );
+    const numBuilt = Array.isArray(numResult) ? numResult : [numResult];
+    expect(numBuilt[numBuilt.length - 1]?.description).toContain("Uniswap V3 swap");
+
+    // string amount
+    const strResult = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "USDC",
+        assetOut: "WETH",
+        amount: "10" as unknown as Expression,
+        mode: "exact_in",
+        feeTier: 3000,
+      },
+      ctx
+    );
+    const strBuilt = Array.isArray(strResult) ? strResult : [strResult];
+    expect(strBuilt[strBuilt.length - 1]?.description).toContain("Uniswap V3 swap");
+
+    // unsupported amount type
+    await expect(
+      adapter.buildAction(
+        {
+          type: "swap",
+          venue: "uniswap_v3",
+          assetIn: "USDC",
+          assetOut: "WETH",
+          amount: { foo: true } as unknown as Expression,
+          mode: "exact_in",
+          feeTier: 3000,
+        },
+        ctx
+      )
+    ).rejects.toThrow("Unsupported amount type");
+  });
+
+  test("description includes expected output and slippage", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const result = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "USDC",
+        assetOut: "WETH",
+        amount: 1000000n as unknown as Expression,
+        mode: "exact_in",
+        feeTier: 3000,
+      },
+      ctx
+    );
+
+    const built = Array.isArray(result) ? result : [result];
+    const swapTx = built[built.length - 1];
+    expect(swapTx?.description).toContain("expected:");
+    expect(swapTx?.description).toContain("min output:");
+    expect(swapTx?.description).toContain("pool:");
+  });
+
+  test("does not throw when pool returns zero quote with min_output constraint", async () => {
+    // When expectedOut is 0 (zero liquidity / tiny amount), computeSlippageBpsFromMinOut
+    // would throw "Cannot compute slippage from zero expected output".
+    // The guard should fall through to defaultSlippageBps instead.
+    // Use a very small sqrtPriceX96 (but still within SDK bounds) so that
+    // price.quote() on a tiny input rounds down to 0.
+    const tinyPriceSlot0 = [
+      4295128739n, // MIN_SQRT_RATIO from Uniswap SDK (smallest valid)
+      -887272n, // MIN_TICK
+      0n,
+      0n,
+      0n,
+      0n,
+      true,
+    ] as const;
+
+    const zeroProvider = {
+      chainId: 1,
+      readContract: async (params: { functionName: string }) => {
+        if (params.functionName === "slot0") return tinyPriceSlot0;
+        if (params.functionName === "liquidity") return 1n; // minimal liquidity
+        return 0n;
+      },
+      getClient: () => ({
+        readContract: async () => 0n,
+      }),
+    } as unknown as Provider;
+
+    const zeroCtx: VenueAdapterContext = { ...ctx, provider: zeroProvider };
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const result = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "USDC",
+        assetOut: "WETH",
+        amount: 1n as unknown as Expression, // tiny amount → expectedOut = 0
+        mode: "exact_in",
+        feeTier: 3000,
+        constraints: { minOutput: 1n },
+      },
+      zeroCtx
+    );
+
+    const built = Array.isArray(result) ? result : [result];
+    // Should succeed with default slippage instead of throwing
+    expect(built[built.length - 1]?.description).toContain("Uniswap V3 swap");
+    expect(built[built.length - 1]?.metadata?.quote?.slippageBps).toBe(50); // default
+  });
+
+  test("handles zero-quote gracefully without division by zero (preview mode)", async () => {
+    // Reproduces eval failure: 0.5 ETH swap in preview mode where pool quote
+    // returns 0 output (no real wallet context). Previously caused division by
+    // zero in priceImpact / minimumAmountOut calculations.
+    const tinyPriceSlot0 = [
+      4295128739n, // MIN_SQRT_RATIO (smallest valid)
+      -887272n,
+      0n,
+      0n,
+      0n,
+      0n,
+      true,
+    ] as const;
+
+    const zeroProvider = {
+      chainId: 1,
+      readContract: async (params: { functionName: string }) => {
+        if (params.functionName === "slot0") return tinyPriceSlot0;
+        if (params.functionName === "liquidity") return 1n;
+        return 0n;
+      },
+      getClient: () => ({
+        readContract: async () => 0n,
+      }),
+    } as unknown as Provider;
+
+    const zeroCtx: VenueAdapterContext = { ...ctx, provider: zeroProvider };
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    // No constraints — the exact eval scenario
+    const result = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "USDC",
+        assetOut: "WETH",
+        amount: 500000000n as unknown as Expression, // 500 USDC
+        mode: "exact_in",
+        feeTier: 3000,
+      },
+      zeroCtx
+    );
+
+    const built = Array.isArray(result) ? result : [result];
+    expect(built[built.length - 1]?.description).toContain("Uniswap V3 swap");
+    expect(built[built.length - 1]?.description).toContain("expected:   ~0");
+  });
+
+  test("wraps ETH and approves WETH for native ETH input", async () => {
+    const adapter = createUniswapV3Adapter();
+    if (!adapter.buildAction) throw new Error("Missing buildAction");
+
+    const amount = 1000000000000000n; // 0.001 ETH
+
+    const result = await adapter.buildAction(
+      {
+        type: "swap",
+        venue: "uniswap_v3",
+        assetIn: "ETH",
+        assetOut: "USDC",
+        amount: amount as unknown as Expression,
+        mode: "exact_in",
+        feeTier: 3000,
+      },
+      ctx
+    );
+
+    const built = Array.isArray(result) ? result : [result];
+    // Wrap ETH + approve WETH + swap = 3 transactions
+    expect(built).toHaveLength(3);
+    // First tx: wrap ETH → WETH (sends ETH value to WETH contract)
+    expect(built[0]?.description).toContain("Wrap");
+    expect(built[0]?.tx.value).toBe(amount);
+    // Second tx: approve WETH
+    expect(built[1]?.description).toContain("Approve WETH");
+    // Third tx: the swap (value should be 0 since we use WETH now)
+    expect(built[2]?.description).toContain("Uniswap V3 swap");
+    expect(built[2]?.tx.value).toBe(0n);
+  });
+});

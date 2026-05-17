@@ -1,0 +1,7 @@
+interface:
+  display_name: "Coding Agent Coach"
+  short_description: "Coach developers to work efficiently with AI coding agents"
+  default_prompt: "Use $coding-agent-coach to analyze my coding agent's output and suggest next steps."
+
+policy:
+  allow_implicit_invocation: true

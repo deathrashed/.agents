@@ -1,0 +1,20 @@
+name: Preview Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  publish:
+    # Skip for forks — they don't have write access needed by pkg-pr-new.
+    if: github.repository_owner == 'cloudflare'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - run: vp run build
+      - run: vp dlx pkg-pr-new@0.0.66 publish --pnpm './packages/vinext'

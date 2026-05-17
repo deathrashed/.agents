@@ -1,0 +1,46 @@
+{
+  "name": "@grimoirelabs/core",
+  "version": "0.21.0",
+  "description": "Core compiler and runtime for Grimoire",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/types/index.js",
+    "./compiler": "./dist/compiler/index.js",
+    "./runtime": "./dist/runtime/index.js",
+    "./builders": "./dist/builders/index.js",
+    "./venues": "./dist/venues/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/franalgaba/grimoire",
+    "directory": "packages/core"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "ethers": "^6.16.0",
+    "viem": "^2.47.6",
+    "yaml": "^2.8.3",
+    "zod": "^3.25.0"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^9.6.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

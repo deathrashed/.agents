@@ -1,0 +1,319 @@
+/**
+ * Execution Context
+ * Manages state during spell execution
+ */
+
+import type { CallFrame, ExecutionContext, LedgerEntry, LedgerEvent } from "../types/execution.js";
+import type { SpellIR } from "../types/ir.js";
+import type { PolicySet } from "../types/policy.js";
+import type { Address, ChainId, Trigger } from "../types/primitives.js";
+import type { QueryProvider } from "../types/query-provider.js";
+
+/**
+ * Options for creating an execution context
+ */
+export interface CreateContextOptions {
+  spell: SpellIR;
+  policy?: PolicySet;
+  vault: Address;
+  chain: ChainId;
+  runId?: string;
+  trigger?: ExecutionContext["trigger"];
+  params?: Record<string, unknown>;
+  persistentState?: Record<string, unknown>;
+  queryProvider?: QueryProvider;
+}
+
+/**
+ * Create a new execution context
+ */
+export function createContext(options: CreateContextOptions): ExecutionContext {
+  const {
+    spell,
+    policy,
+    vault,
+    chain,
+    runId,
+    trigger,
+    params = {},
+    persistentState = {},
+  } = options;
+
+  // Generate run ID
+  const now = new Date();
+  const timestamp = now
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d+Z$/, "");
+  const random = Math.random().toString(36).slice(2, 8);
+  const resolvedRunId = runId ?? `${timestamp}-${random}`;
+
+  // Initialize state from schema
+  const persistent = new Map<string, unknown>();
+  const ephemeral = new Map<string, unknown>();
+
+  // Load persistent state schema defaults
+  for (const [key, field] of Object.entries(spell.state.persistent)) {
+    persistent.set(key, persistentState[key] ?? field.initialValue);
+  }
+
+  // Initialize ephemeral state from schema
+  for (const [key, field] of Object.entries(spell.state.ephemeral)) {
+    ephemeral.set(key, field.initialValue);
+  }
+
+  // Initialize bindings with state defaults first
+  const bindings = new Map<string, unknown>();
+  for (const [key, value] of persistent.entries()) {
+    bindings.set(key, value);
+  }
+  for (const [key, value] of ephemeral.entries()) {
+    bindings.set(key, value);
+  }
+
+  // Initialize bindings with params (override state keys if same name)
+  for (const param of spell.params) {
+    const value = params[param.name] ?? param.default;
+    bindings.set(param.name, value);
+  }
+
+  // Make asset symbols available as string bindings (e.g., ETH → "ETH")
+  // and the "assets" array itself for `for asset in assets:` loops
+  for (const asset of spell.assets) {
+    bindings.set(asset.symbol, asset.symbol);
+  }
+  bindings.set(
+    "assets",
+    spell.assets.map((a) => a.symbol)
+  );
+
+  // Make venue aliases available in expressions (e.g. apy(aave, USDC)).
+  // Label bindings point to canonical alias names.
+  for (const venue of spell.aliases) {
+    bindings.set(venue.alias, venue.alias);
+    if (venue.label && !bindings.has(venue.label)) {
+      bindings.set(venue.label, venue.alias);
+    }
+  }
+
+  // Make limits available as a "limits" object binding so `limits.x` property
+  // access works at runtime (limits are stored as params with "limit_" prefix)
+  const limitsObj: Record<string, unknown> = {};
+  for (const param of spell.params) {
+    if (param.name.startsWith("limit_")) {
+      const key = param.name.slice("limit_".length);
+      limitsObj[key] = params[param.name] ?? param.default;
+    }
+  }
+  if (Object.keys(limitsObj).length > 0) {
+    bindings.set("limits", limitsObj);
+  }
+
+  return {
+    spell,
+    policy,
+    runId: resolvedRunId,
+    startTime: now.getTime(),
+    trigger: trigger ?? normalizeTrigger(spell.triggers[0]),
+    vault,
+    chain,
+    state: { persistent, ephemeral },
+    bindings,
+    callStack: [],
+    executedSteps: [],
+    metrics: {
+      stepsExecuted: 0,
+      actionsExecuted: 0,
+      gasUsed: 0n,
+      advisoryCalls: 0,
+      errors: 0,
+      retries: 0,
+    },
+    queryProvider: options.queryProvider,
+  };
+}
+
+function normalizeTrigger(
+  trigger: Trigger | ExecutionContext["trigger"] | undefined
+): ExecutionContext["trigger"] {
+  if (!trigger) {
+    return { type: "manual" };
+  }
+
+  if (trigger.type === "any" && "triggers" in trigger && Array.isArray(trigger.triggers)) {
+    return {
+      type: "any",
+      triggers: trigger.triggers.map((item) => normalizeTrigger(item)),
+    };
+  }
+
+  return { ...trigger };
+}
+
+/**
+ * Push a call frame onto the stack
+ */
+export function pushFrame(
+  ctx: ExecutionContext,
+  stepId: string,
+  iteration?: number,
+  branch?: string
+): void {
+  ctx.callStack.push({
+    stepId,
+    startTime: Date.now(),
+    iteration,
+    branch,
+  });
+}
+
+/**
+ * Pop a call frame from the stack
+ */
+export function popFrame(ctx: ExecutionContext): CallFrame | undefined {
+  return ctx.callStack.pop();
+}
+
+/**
+ * Set a binding value
+ */
+export function setBinding(ctx: ExecutionContext, name: string, value: unknown): void {
+  ctx.bindings.set(name, value);
+  if (ctx.state.persistent.has(name)) {
+    ctx.state.persistent.set(name, value);
+  } else if (ctx.state.ephemeral.has(name)) {
+    ctx.state.ephemeral.set(name, value);
+  }
+}
+
+/**
+ * Get a binding value
+ */
+export function getBinding(ctx: ExecutionContext, name: string): unknown {
+  return ctx.bindings.get(name);
+}
+
+/**
+ * Update persistent state
+ */
+export function setPersistentState(ctx: ExecutionContext, key: string, value: unknown): void {
+  ctx.state.persistent.set(key, value);
+  ctx.bindings.set(key, value);
+}
+
+/**
+ * Update ephemeral state
+ */
+export function setEphemeralState(ctx: ExecutionContext, key: string, value: unknown): void {
+  ctx.state.ephemeral.set(key, value);
+  ctx.bindings.set(key, value);
+}
+
+/**
+ * Mark a step as executed
+ */
+export function markStepExecuted(ctx: ExecutionContext, stepId: string): void {
+  ctx.executedSteps.push(stepId);
+  ctx.metrics.stepsExecuted++;
+}
+
+/**
+ * Increment action counter
+ */
+export function incrementActions(ctx: ExecutionContext): void {
+  ctx.metrics.actionsExecuted++;
+}
+
+/**
+ * Add gas used
+ */
+export function addGasUsed(ctx: ExecutionContext, gas: bigint): void {
+  ctx.metrics.gasUsed += gas;
+}
+
+/**
+ * Increment error counter
+ */
+export function incrementErrors(ctx: ExecutionContext): void {
+  ctx.metrics.errors++;
+}
+
+/**
+ * Increment retry counter
+ */
+export function incrementRetries(ctx: ExecutionContext): void {
+  ctx.metrics.retries++;
+}
+
+/**
+ * Increment advisory call counter
+ */
+export function incrementAdvisoryCalls(ctx: ExecutionContext): void {
+  ctx.metrics.advisoryCalls++;
+}
+
+/**
+ * Check if a step has been executed
+ */
+export function isStepExecuted(ctx: ExecutionContext, stepId: string): boolean {
+  return ctx.executedSteps.includes(stepId);
+}
+
+/**
+ * Get persistent state as a plain object
+ */
+export function getPersistentStateObject(ctx: ExecutionContext): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  for (const [key, value] of ctx.state.persistent) {
+    obj[key] = value;
+  }
+  return obj;
+}
+
+/**
+ * Simple in-memory ledger for Mode 1
+ */
+export class InMemoryLedger {
+  private entries: LedgerEntry[] = [];
+  private runId: string;
+  private spellId: string;
+  private onEntry?: (entry: LedgerEntry) => void;
+
+  constructor(runId: string, spellId: string, onEntry?: (entry: LedgerEntry) => void) {
+    this.runId = runId;
+    this.spellId = spellId;
+    this.onEntry = onEntry;
+  }
+
+  emit(event: LedgerEvent): void {
+    const entry: LedgerEntry = {
+      id: `evt_${this.entries.length.toString().padStart(3, "0")}`,
+      timestamp: Date.now(),
+      runId: this.runId,
+      spellId: this.spellId,
+      event,
+    };
+    this.entries.push(entry);
+    try {
+      this.onEntry?.(entry);
+    } catch {
+      // Never fail execution because an observer callback throws.
+    }
+  }
+
+  getEntries(): LedgerEntry[] {
+    return [...this.entries];
+  }
+
+  toJSON(): object {
+    return {
+      runId: this.runId,
+      spellId: this.spellId,
+      events: this.entries.map((e) => ({
+        id: e.id,
+        timestamp: new Date(e.timestamp).toISOString(),
+        event: e.event,
+      })),
+    };
+  }
+}

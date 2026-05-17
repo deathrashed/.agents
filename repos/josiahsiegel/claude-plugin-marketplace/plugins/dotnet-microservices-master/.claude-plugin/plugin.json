@@ -1,0 +1,24 @@
+{
+  "name": "dotnet-microservices-master",
+  "version": "1.0.5",
+  "description": "Expert agent on .NET microservices architecture, containerization, Docker, DDD, CQRS, and cloud-native patterns based on Microsoft's official guide",
+  "author": {
+    "name": "Josiah Siegel",
+    "email": "[email protected]"
+  },
+  "homepage": "https://github.com/JosiahSiegel/claude-plugin-marketplace/tree/main/plugins/dotnet-microservices-master",
+  "repository": "https://github.com/JosiahSiegel/claude-plugin-marketplace",
+  "license": "MIT",
+  "keywords": [
+    ".net",
+    "microservices",
+    "docker",
+    "containers",
+    "kubernetes",
+    "ddd",
+    "cqrs",
+    "architecture",
+    "azure",
+    "eshop"
+  ]
+}

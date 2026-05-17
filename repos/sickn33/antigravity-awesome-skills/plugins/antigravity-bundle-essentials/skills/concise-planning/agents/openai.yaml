@@ -1,0 +1,7 @@
+interface:
+  display_name: "Concise Planning"
+  short_description: "Generate actionable atomic plans for coding tasks"
+  default_prompt: "Use $concise-planning to break down this coding task into an actionable atomic checklist."
+
+policy:
+  allow_implicit_invocation: true

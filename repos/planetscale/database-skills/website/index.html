@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Skills — AI Agent Skills for Databases by PlanetScale</title>
+  <meta name="description" content="Database-focused skills for AI coding assistants. MySQL, Postgres, Vitess, and more. Built by PlanetScale.">
+  <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="16x16 32x32 48x48 64x64 128x128">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <meta property="og:title" content="Database Skills — AI Agent Skills for Databases by PlanetScale">
+  <meta property="og:description" content="Database-focused skills for AI coding assistants. MySQL, Postgres, Vitess, and more. Built by PlanetScale.">
+  <meta property="og:image" content="https://database-skills.com/social-card.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Database Skills — AI Agent Skills for Databases by PlanetScale">
+  <meta name="twitter:description" content="Database-focused skills for AI coding assistants. MySQL, Postgres, Vitess, and more. Built by PlanetScale.">
+  <meta name="twitter:image" content="https://database-skills.com/social-card.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #101112;
+      --bg-elevated: #18191a;
+      --bg-card: #141516;
+      --border: #1e1f21;
+      --border-hover: #2a2b2d;
+      --text-primary: #ededed;
+      --text-secondary: #888888;
+      --text-tertiary: #555555;
+      --ps-orange: #f35815;
+      --ps-orange-dim: rgba(243, 88, 21, 0.15);
+      --ps-orange-glow: rgba(243, 88, 21, 0.08);
+      --mono: 'SF Mono', 'Fira Code', monospace;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--mono);
+      background: var(--bg);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* ─── Top nav ─── */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      height: 56px;
+      background: rgba(16, 17, 18, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: var(--text-primary);
+      font-family: var(--mono);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .nav-logo img {
+      display: block;
+      height: 24px;
+      width: 24px;
+    }
+
+    .nav-divider {
+      color: var(--text-tertiary);
+      font-size: 1.25rem;
+      font-weight: 300;
+      user-select: none;
+    }
+
+    .nav-title {
+      font-family: var(--mono);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: 0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .nav-links a {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-primary);
+    }
+
+    /* ─── Main content ─── */
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    /* ─── Hero ─── */
+    .hero {
+      padding-top: 140px;
+      text-align: center;
+      text-wrap: balance;
+    }
+
+    .hero-badge,
+    .hero-badge:link,
+    .hero-badge:visited,
+    .hero-badge:hover,
+    .hero-badge:focus,
+    .hero-badge:active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin: 1.5rem auto 2.5rem;
+      width: fit-content;
+      background: var(--bg-elevated);
+      text-decoration: none !important;
+    }
+
+    .hero-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #27b648;
+      box-shadow: 0 0 8px #27b648;
+    }
+
+    .ascii-art {
+      font-family: var(--mono);
+      font-size: clamp(0.45rem, 1.2vw, 0.75rem);
+      line-height: 1.2;
+      color: var(--ps-orange);
+      white-space: pre;
+      margin-bottom: 2.5rem;
+      display: inline-block;
+      text-align: left;
+      opacity: 0.9;
+    }
+
+    .hero-subtitle {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-description {
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
+      line-height: 1.5;
+      color: var(--text-secondary);
+      max-width: 640px;
+      margin: 0 auto 0;
+    }
+
+    .hero-description strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* ─── Install block ─── */
+    .install-section {
+      text-align: center;
+      text-wrap: balance;
+      margin-top: 3rem;
+      margin-bottom: 3rem;
+    }
+
+    .install-label {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--text-tertiary);
+      margin-bottom: 1rem;
+    }
+
+    .install-block {
+      display: inline-flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.875rem 1.25rem;
+      transition: border-color 0.2s;
+      cursor: pointer;
+    }
+
+    .install-block:hover {
+      border-color: var(--border-hover);
+    }
+
+    .install-block code {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+
+    .install-block code .prompt {
+      color: var(--text-tertiary);
+    }
+
+    .install-block code .cmd {
+      color: var(--text-secondary);
+    }
+
+    .install-block code .arg {
+      color: var(--ps-orange);
+    }
+
+    .copy-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-tertiary);
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s, background 0.2s;
+    }
+
+    .copy-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .copy-feedback {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--ps-orange);
+      margin-top: 0.5rem;
+    }
+
+    /* ─── Skills section ─── */
+    .section {
+      margin-top: 3rem;
+      margin-bottom: 5rem;
+    }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--text-tertiary);
+      margin-bottom: 1.5rem;
+      text-align: center;
+      text-wrap: balance;
+    }
+
+    .skills-grid {
+      display: grid;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .skill-card {
+      background: var(--bg-card);
+      padding: 1.75rem;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 1.25rem;
+      align-items: start;
+      border: 1px solid var(--border);
+      transition: border-color 0.2s;
+    }
+
+    .skill-card:hover {
+      border-color: var(--border-hover);
+    }
+
+    .skill-icon {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .skill-icon img {
+      object-fit: contain;
+      width: 40px;
+      height: 40px;
+    }
+
+    .skill-info {
+      min-width: 0;
+    }
+
+    .skill-name {
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.375rem;
+    }
+
+    .skill-repo {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      margin-bottom: 0.625rem;
+    }
+
+    .skill-desc {
+      font-size: 0.875rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .skill-arrow {
+      color: var(--text-tertiary);
+      font-size: 1.25rem;
+      align-self: center;
+      transition: color 0.2s, transform 0.2s;
+    }
+
+    .skill-card:hover .skill-arrow {
+      color: var(--text-secondary);
+    }
+
+    /* ─── Agents section ─── */
+    .agents-section {
+      text-align: center;
+      text-wrap: balance;
+      margin-bottom: 5rem;
+    }
+
+    .agents-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .agent-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .agent-pill:hover {
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+    }
+
+    /* ─── Structure section ─── */
+    .structure-block {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      margin-bottom: 5rem;
+    }
+
+    .structure-block pre {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.8;
+      color: var(--text-secondary);
+      overflow-x: auto;
+    }
+
+    .structure-block pre .dir {
+      color: var(--ps-orange);
+    }
+
+    .structure-block pre .file {
+      color: var(--text-primary);
+    }
+
+    /* ─── Contributing section ─── */
+    .contributing {
+      text-align: center;
+      text-wrap: balance;
+      margin-bottom: 5rem;
+    }
+
+    .contributing-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 1.5rem;
+    }
+
+    .step {
+      background: var(--bg-card);
+      padding: 1.5rem;
+      text-align: center;
+      text-wrap: balance;
+    }
+
+    .step-number {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--ps-orange);
+      margin-bottom: 0.75rem;
+      letter-spacing: 0.1em;
+    }
+
+    .step-text {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .step-text code {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+      font-size: 0.75rem;
+    }
+
+    /* ─── Footer ─── */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      text-wrap: balance;
+    }
+
+    .footer-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: var(--text-tertiary);
+      font-family: var(--mono);
+      font-size: 0.875rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+      margin: 1rem 0;
+    }
+
+    .footer-logo:hover {
+      opacity: 1;
+    }
+
+    .footer-logo img {
+      height: 20px;
+      width: 20px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .footer-links a {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      text-decoration: none;
+      letter-spacing: 0.02em;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--text-secondary);
+    }
+
+    .footer-copy {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+      letter-spacing: 0.02em;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 640px) {
+      .nav {
+        padding: 0 1rem;
+      }
+
+      main {
+        padding: 0 1rem;
+      }
+
+      .hero {
+        padding-top: 110px;
+      }
+
+      .ascii-art {
+        font-size: clamp(0.4rem, 1.0vw, 0.5rem);
+      }
+
+      .skill-card {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        padding: 1.25rem;
+      }
+
+      .skill-icon img {
+        width: 32px;
+        height: 32px;
+      }
+
+      .skill-arrow {
+        display: none;
+      }
+
+      .contributing-steps {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-links {
+        gap: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── Navigation ─── -->
+  <nav class="nav">
+    <div class="nav-left">
+      <a href="https://planetscale.com" class="nav-logo" aria-label="PlanetScale">
+        <img src="https://brand.psdb.co/assets/logo/SVG/planetscale-logo-mark-white.svg" alt="" width="24" height="24">
+      </a>
+    </div>
+    <div class="nav-links">
+      <a href="https://github.com/planetscale/database-skills">GitHub</a>
+      <a href="https://skills.sh">skills.sh</a>
+      <a href="https://planetscale.com/docs">docs</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- ─── Hero ─── -->
+    <section class="hero">
+      <div class="ascii-art">
+██████╗ ██████╗     ███████╗██╗  ██╗██╗██╗     ██╗     ███████╗
+██╔══██╗██╔══██╗    ██╔════╝██║ ██╔╝██║██║     ██║     ██╔════╝
+██║  ██║██████╔╝    ███████╗█████╔╝ ██║██║     ██║     ███████╗
+██║  ██║██╔══██╗    ╚════██║██╔═██╗ ██║██║     ██║     ╚════██║
+██████╔╝██████╔╝    ███████║██║  ██╗██║███████╗███████╗███████║
+╚═════╝ ╚═════╝     ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝</div>
+
+      <a href="https://planetscale.com" class="hero-badge" target="_blank" rel="noopener noreferrer" aria-label="Visit PlanetScale">
+        <span class="dot"></span>
+        Built by PlanetScale
+      </a>
+
+      <p class="hero-subtitle">Database Skills for AI Agents</p>
+
+      <p class="hero-description">
+        <strong>Make your agents smarter</strong> when working with Postgres, MySQL, Vitess, and Neki databases.
+      </p>
+    </section>
+
+    <!-- ─── Install ─── -->
+    <section class="install-section">
+      <p class="install-label">Install</p>
+      <div class="install-block" onclick="copyInstall()" role="button" tabindex="0" aria-label="Copy install command">
+        <code><span class="prompt">$</span> <span class="cmd">npx skills add</span> <span class="arg">planetscale/database-skills</span></code>
+        <button class="copy-btn" aria-label="Copy to clipboard">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+      <p class="copy-feedback" id="copyFeedback"></p>
+    </section>
+
+    <!-- ─── Available Skills ─── -->
+    <section class="section">
+      <p class="section-label">Available Skills</p>
+      <div class="skills-grid">
+
+        <a href="https://github.com/planetscale/database-skills/tree/main/skills/postgres/SKILL.md" class="skill-card" style="text-decoration: none; color: inherit;">
+          <div class="skill-icon">
+            <img src="postgres.png" alt="Postgres">
+          </div>
+          <div class="skill-info">
+            <div class="skill-name">postgres</div>
+            <div class="skill-repo">planetscale/database-skills</div>
+            <p class="skill-desc">Postgres is a powerful open-source relational database known for SQL excellent performance, a strong extension ecosystem, and rich indexing capabilities.</p>
+          </div>
+          <span class="skill-arrow">&rsaquo;</span>
+        </a>
+
+        <a href="https://github.com/planetscale/database-skills/tree/main/skills/mysql/SKILL.md" class="skill-card" style="text-decoration: none; color: inherit;">
+          <div class="skill-icon">
+            <img src="mysql.png" alt="MySQL">
+          </div>
+          <div class="skill-info">
+            <div class="skill-name">mysql</div>
+            <div class="skill-repo">planetscale/database-skills</div>
+            <p class="skill-desc">MySQL is a widely used relational database built for speed and reliability. Use for transactional workloads and high-concurrency applications.</p>
+          </div>
+          <span class="skill-arrow">&rsaquo;</span>
+        </a>
+
+        <a href="https://github.com/planetscale/database-skills/tree/main/skills/vitess/SKILL.md" class="skill-card" style="text-decoration: none; color: inherit;">
+          <div class="skill-icon">
+            <img src="vitess.png" alt="Vitess">
+          </div>
+          <div class="skill-info">
+            <div class="skill-name">vitess</div>
+            <div class="skill-repo">planetscale/database-skills</div>
+            <p class="skill-desc">Vitess is a scaling and sharding layer for MySQL that adds routing, connection management, and horizontal partitioning so large datasets can run as one logical database.</p>
+          </div>
+          <span class="skill-arrow">&rsaquo;</span>
+        </a>
+
+        <a href="https://github.com/planetscale/database-skills/tree/main/skills/neki/SKILL.md" class="skill-card" style="text-decoration: none; color: inherit;">
+          <div class="skill-icon">
+            <img src="neki.svg" alt="Neki">
+          </div>
+          <div class="skill-info">
+            <div class="skill-name">neki</div>
+            <div class="skill-repo">planetscale/database-skills</div>
+            <p class="skill-desc">Neki is PlanetScale's sharded PostgreSQL platform, designed to scale Postgres across many nodes while preserving familiar Postgres capabilities for high-growth applications.</p>
+          </div>
+          <span class="skill-arrow">&rsaquo;</span>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ─── Compatible Agents ─── -->
+    <section class="agents-section">
+      <p class="section-label">Works With</p>
+      <div class="agents-grid">
+        <span class="agent-pill">Cursor</span>
+        <span class="agent-pill">Codex</span>
+        <span class="agent-pill">AMP</span>
+        <span class="agent-pill">Claude Code</span>
+        <span class="agent-pill">OpenCode</span>
+        <span class="agent-pill">Antigravity</span>
+        <span class="agent-pill">and many more...</span>
+      </div>
+    </section>
+
+    <!-- ─── Repo Structure ─── -->
+    <section class="section">
+      <p class="section-label">Repo Structure</p>
+      <div class="structure-block">
+        <pre><span class="dir">database-skills/</span>
+├── <span class="file">README.md</span>
+└── <span class="dir">skills/</span>
+    ├── <span class="dir">postgres/</span>
+    │   ├── <span class="file">SKILL.md</span>
+    │   └── <span class="dir">references/</span>
+    ├── <span class="dir">mysql/</span>
+    │   ├── <span class="file">SKILL.md</span>
+    │   └── <span class="dir">references/</span>
+    ├── <span class="dir">vitess/</span>
+    │   ├── <span class="file">SKILL.md</span>
+    │   └── <span class="dir">references/</span>
+    └── <span class="dir">neki/</span>
+        ├── <span class="file">SKILL.md</span>
+        └── <span class="dir">references/</span></pre>
+      </div>
+    </section>
+
+    <!-- ─── Contributing ─── -->
+    <section class="contributing">
+      <p class="section-label">Contributing</p>
+      <div class="contributing-steps">
+        <div class="step">
+          <div class="step-number">01</div>
+          <div class="step-text">Fork the repo</div>
+        </div>
+        <div class="step">
+          <div class="step-number">02</div>
+          <div class="step-text">Create a skill directory under <code>skills/</code></div>
+        </div>
+        <div class="step">
+          <div class="step-number">03</div>
+          <div class="step-text">Add <code>SKILL.md</code> and optional <code>references/</code></div>
+        </div>
+        <div class="step">
+          <div class="step-number">04</div>
+          <div class="step-text">Submit a PR</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─── Footer ─── -->
+  <footer>
+    <div class="footer-inner">
+      <a href="https://planetscale.com" class="footer-logo" aria-label="PlanetScale">
+        <img src="https://brand.psdb.co/assets/logo/SVG/planetscale-logo-mark-white.svg" alt="" width="20" height="20">
+      </a>
+      <div class="footer-links">
+        <a href="https://github.com/planetscale/database-skills">GitHub</a>
+        <a href="https://skills.sh">skills.sh</a>
+        <a href="https://planetscale.com">PlanetScale</a>
+        <a href="https://planetscale.com/docs">Documentation</a>
+      </div>
+      <p class="footer-copy">&copy; 2026 PlanetScale, Inc.</p>
+    </div>
+  </footer>
+
+  <script>
+    function copyInstall() {
+      const cmd = 'npx skills add planetscale/database-skills';
+      navigator.clipboard.writeText(cmd).then(() => {
+        const el = document.getElementById('copyFeedback');
+        el.textContent = 'Copied to clipboard!';
+        setTimeout(() => { el.textContent = ''; }, 2000);
+      });
+    }
+
+    // Also handle Enter/Space on the install block for keyboard accessibility
+    document.querySelector('.install-block').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        copyInstall();
+      }
+    });
+  </script>
+
+</body>
+</html>

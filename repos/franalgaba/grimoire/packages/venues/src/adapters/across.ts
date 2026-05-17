@@ -1,0 +1,484 @@
+import { addressToBytes32, getIntegratorDataSuffix, getQuote } from "@across-protocol/app-sdk";
+import { spokePoolAbiV3_5 } from "@across-protocol/app-sdk/dist/abis/SpokePool/v3_5.js";
+import type {
+  Address,
+  AssetDef,
+  MetricRequest,
+  VenueAdapter,
+  VenueAdapterContext,
+} from "@grimoirelabs/core";
+import { zeroAddress } from "viem";
+import { toBigInt, toBigIntIfPossible } from "../shared/bigint.js";
+import { applyBps } from "../shared/bps.js";
+import {
+  assertSupportedConstraints,
+  assertSupportedMetricSurface,
+  validateGasConstraints,
+} from "../shared/constraints.js";
+import { buildApprovalIfNeeded } from "../shared/erc20.js";
+import { estimateGasIfSupported } from "../shared/gas.js";
+import {
+  parseMetricSelector,
+  readMetricSelectorBigInt,
+  readMetricSelectorInt,
+  readMetricSelectorString,
+  scaleToHuman,
+} from "../shared/metric-selector.js";
+import {
+  resolveBridgedTokenAddress,
+  resolveTokenAddress,
+  safeResolveTokenDecimals,
+  tryResolveTokenByAddress,
+} from "../shared/token-registry.js";
+
+export interface AcrossAdapterConfig {
+  integratorId?: `0x${string}`;
+  assets?: Record<string, Record<number, Address>>;
+  supportedChains?: number[];
+  apiUrl?: string;
+  getQuote?: typeof getQuote;
+  slippageBps?: number;
+}
+
+const DEFAULT_INTEGRATOR_ID = "0x0000" as const;
+const DEFAULT_SUPPORTED_CHAINS = [1, 10, 137, 8453, 42161];
+
+export function createAcrossAdapter(config: AcrossAdapterConfig = {}): VenueAdapter {
+  const getQuoteImpl = config.getQuote ?? getQuote;
+  const integratorId = config.integratorId ?? DEFAULT_INTEGRATOR_ID;
+  const assets = config.assets ?? {};
+  const supportedChains = config.supportedChains ?? DEFAULT_SUPPORTED_CHAINS;
+
+  const meta: VenueAdapter["meta"] = {
+    name: "across",
+    supportedChains,
+    actions: ["bridge"],
+    supportedConstraints: [
+      "max_slippage",
+      "min_output",
+      "require_quote",
+      "require_simulation",
+      "max_gas",
+    ],
+    supportsQuote: true,
+    supportsSimulation: true,
+    supportsPreviewCommit: true,
+    metricSurfaces: ["quote_out"],
+    dataEndpoints: ["quote", "deposit_simulation"],
+    description: "Across Protocol bridge adapter",
+  };
+
+  const resolveHandoffStatus: NonNullable<VenueAdapter["resolveHandoffStatus"]> = async (input) => {
+    return await resolveAcrossHandoffStatus(input, config.apiUrl);
+  };
+
+  return {
+    meta,
+    async readMetric(request: MetricRequest, ctx: VenueAdapterContext): Promise<number> {
+      assertSupportedMetricSurface(meta, request);
+      if (!request.asset) {
+        throw new Error("Across quote_out metric requires asset as the third argument");
+      }
+
+      const selector = parseMetricSelector(request.selector);
+      const destinationChainId = readMetricSelectorInt(
+        selector,
+        ["to_chain", "destination_chain", "chain", "to"],
+        { required: true, label: "to_chain" }
+      );
+      const outputAsset =
+        readMetricSelectorString(selector, ["asset_out", "output_asset"], {
+          fallback: request.asset,
+          label: "asset_out",
+        }) ?? request.asset;
+
+      const originDecimals = safeResolveTokenDecimals(request.asset, ctx.chainId, 18);
+      const defaultAmount = 10n ** BigInt(originDecimals);
+      const amount =
+        readMetricSelectorBigInt(selector, ["amount", "amount_in", "in"], {
+          fallback: defaultAmount,
+          label: "amount",
+        }) ?? defaultAmount;
+
+      const inputToken = resolveAssetAddress(request.asset, ctx.chainId, assets);
+      const outputToken = resolveAssetAddress(
+        outputAsset,
+        destinationChainId,
+        assets,
+        inputToken,
+        ctx.chainId
+      );
+      const quote = await getQuoteImpl({
+        route: {
+          originChainId: ctx.chainId,
+          destinationChainId,
+          inputToken,
+          outputToken,
+        },
+        inputAmount: amount,
+        apiUrl: config.apiUrl,
+        recipient: ctx.walletAddress,
+      });
+
+      const outDecimals = safeResolveTokenDecimals(outputAsset, destinationChainId, originDecimals);
+      return scaleToHuman(quote.deposit.outputAmount, outDecimals);
+    },
+    async buildAction(action, ctx) {
+      assertSupportedConstraints(meta, action);
+
+      if (action.type !== "bridge") {
+        throw new Error(`Across adapter only supports bridge actions (got ${action.type})`);
+      }
+
+      const amount = toBigInt(action.amount, "Across adapter requires a numeric amount");
+      const originChainId = ctx.chainId;
+      if (typeof action.toChain !== "number") {
+        throw new Error("Across adapter requires numeric toChain");
+      }
+      const destinationChainId = action.toChain;
+      const resolvedAssets = mergeSpellAssets(assets, ctx.assets);
+      const inputToken = resolveAssetAddress(action.asset, originChainId, resolvedAssets);
+      const outputToken = resolveOutputAssetAddress({
+        asset: action.asset,
+        originChainId,
+        destinationChainId,
+        assets: resolvedAssets,
+        inputToken,
+      });
+
+      const quote = await getQuoteImpl({
+        route: {
+          originChainId,
+          destinationChainId,
+          inputToken,
+          outputToken,
+        },
+        inputAmount: amount,
+        apiUrl: config.apiUrl,
+        recipient: ctx.walletAddress,
+      });
+      const minDeposit = quote.limits.minDeposit;
+      if (amount < minDeposit) {
+        throw new Error(
+          `Across bridge amount ${amount.toString()} is below minimum ${minDeposit.toString()} for this route`
+        );
+      }
+
+      const client = ctx.provider.getClient?.();
+      if (action.constraints?.requireQuote === true && !quote) {
+        throw new Error("Across adapter could not resolve quote while require_quote is enabled");
+      }
+      if (!client?.simulateContract) {
+        throw new Error("Across adapter requires a provider with simulateContract support");
+      }
+      if (action.constraints?.requireSimulation === true && !client.simulateContract) {
+        throw new Error(
+          "Across adapter requires simulation support while require_simulation is enabled"
+        );
+      }
+
+      const slippageBps = action.constraints?.maxSlippageBps ?? config.slippageBps;
+      const minOutput =
+        action.constraints?.minOutput ??
+        (slippageBps !== undefined
+          ? applyBps(quote.deposit.outputAmount, 10_000 - slippageBps)
+          : quote.deposit.outputAmount);
+
+      const deposit = { ...quote.deposit, outputAmount: minOutput };
+      const recipient = deposit.recipient ?? ctx.walletAddress;
+
+      const simulation = await client.simulateContract({
+        account: ctx.walletAddress,
+        abi: spokePoolAbiV3_5,
+        address: deposit.spokePoolAddress,
+        functionName: "deposit",
+        args: [
+          addressToBytes32(ctx.walletAddress),
+          addressToBytes32(recipient),
+          addressToBytes32(deposit.inputToken),
+          addressToBytes32(deposit.outputToken),
+          deposit.inputAmount,
+          deposit.outputAmount,
+          BigInt(deposit.destinationChainId),
+          addressToBytes32(deposit.exclusiveRelayer ?? zeroAddress),
+          deposit.quoteTimestamp,
+          deposit.fillDeadline,
+          deposit.exclusivityDeadline,
+          deposit.message,
+        ],
+        value: deposit.isNative ? deposit.inputAmount : 0n,
+        dataSuffix: getIntegratorDataSuffix(integratorId),
+      });
+
+      const approvalTxs = deposit.isNative
+        ? []
+        : await buildApprovalIfNeeded({
+            ctx,
+            token: inputToken,
+            spender: deposit.spokePoolAddress,
+            amount: deposit.inputAmount,
+            action,
+            description: `Approve ${action.asset} for Across`,
+          });
+
+      const txRequest = simulation.request;
+      const to = ("to" in txRequest ? txRequest.to : txRequest.address) as Address;
+      const data = ("data" in txRequest ? txRequest.data : "0x") as string;
+      const value = txRequest.value ?? 0n;
+      const gasEstimate = await estimateGasIfSupported(ctx, { to, data, value });
+
+      validateGasConstraints({
+        gasLimit: gasEstimate?.gasLimit,
+        constraints: action.constraints,
+        venueName: "Across adapter",
+      });
+
+      const warnings: string[] = [];
+      if (quote.isAmountTooLow) {
+        warnings.push("Bridge amount is below recommended minimum for this route");
+      }
+
+      const bridgeTx = {
+        tx: {
+          to,
+          data,
+          value,
+        },
+        description: `Across bridge ${action.asset} ${originChainId} → ${destinationChainId}`,
+        gasEstimate,
+        action,
+        metadata: {
+          quote: {
+            expectedIn: quote.deposit.inputAmount,
+            expectedOut: quote.deposit.outputAmount,
+            minOut: deposit.outputAmount,
+            slippageBps,
+          },
+          route: {
+            originChainId,
+            destinationChainId,
+            inputToken,
+            outputToken,
+            spokePoolAddress: deposit.spokePoolAddress,
+            quoteTimestamp: deposit.quoteTimestamp,
+            fillDeadline: deposit.fillDeadline,
+            estimatedFillTimeSec: quote.estimatedFillTimeSec,
+            minDeposit: quote.limits.minDeposit,
+            maxDeposit: quote.limits.maxDeposit,
+            maxDepositInstant: quote.limits.maxDepositInstant,
+          },
+          fees: {
+            lpFee: quote.fees.lpFee,
+            relayerGasFee: quote.fees.relayerGasFee,
+            relayerCapitalFee: quote.fees.relayerCapitalFee,
+            totalRelayFee: quote.fees.totalRelayFee,
+          },
+          warnings,
+        },
+      };
+
+      return [...approvalTxs, bridgeTx];
+    },
+    bridgeLifecycle: {
+      resolveHandoffStatus,
+    },
+    resolveHandoffStatus,
+  };
+}
+
+export const acrossAdapter = createAcrossAdapter({
+  integratorId: DEFAULT_INTEGRATOR_ID,
+  assets: {
+    USDC: {
+      1337: "0x6d1e7cde53a9467b783991afd8af56d4a99b3a56" as Address,
+    },
+  },
+  supportedChains: [...DEFAULT_SUPPORTED_CHAINS, 1337],
+});
+
+function resolveAssetAddress(
+  asset: string,
+  chainId: number,
+  assets: Record<string, Record<number, Address>>,
+  fallback?: Address,
+  originChainId?: number
+): Address {
+  // 1. Direct address passthrough
+  if (asset.startsWith("0x") && asset.length === 42) {
+    return asset as Address;
+  }
+
+  // 2. Config overrides (test chains, user overrides)
+  const configAddr = assets[asset]?.[chainId] ?? assets[asset.toUpperCase()]?.[chainId];
+  if (configAddr) {
+    return configAddr;
+  }
+
+  // 3. Token registry (SHARED_TOKENS + Uniswap list)
+  try {
+    return resolveTokenAddress(asset, chainId);
+  } catch {
+    // Not in registry — try bridge index
+  }
+
+  // 4. Bridge index (cross-chain equivalents from bridgeInfo)
+  if (originChainId !== undefined) {
+    const bridged = resolveBridgedTokenAddress(asset, originChainId, chainId);
+    if (bridged) {
+      return bridged;
+    }
+  }
+
+  // 5. Explicit fallback (input token address used for output token)
+  if (fallback) {
+    return fallback;
+  }
+
+  throw new Error(`No Across asset mapping for ${asset} on chain ${chainId}`);
+}
+
+function mergeSpellAssets(
+  configAssets: Record<string, Record<number, Address>>,
+  spellAssets: AssetDef[] | undefined
+): Record<string, Record<number, Address>> {
+  const merged: Record<string, Record<number, Address>> = {};
+
+  for (const [symbol, chainMap] of Object.entries(configAssets)) {
+    merged[symbol] = { ...chainMap };
+  }
+
+  if (!spellAssets || spellAssets.length === 0) {
+    return merged;
+  }
+
+  for (const asset of spellAssets) {
+    const symbol = asset.symbol?.trim();
+    if (!symbol || !asset.address || typeof asset.chain !== "number") {
+      continue;
+    }
+
+    const existing = merged[symbol] ?? {};
+    existing[asset.chain] = asset.address;
+    merged[symbol] = existing;
+
+    const upper = symbol.toUpperCase();
+    if (upper !== symbol) {
+      const upperExisting = merged[upper] ?? {};
+      upperExisting[asset.chain] = asset.address;
+      merged[upper] = upperExisting;
+    }
+  }
+
+  return merged;
+}
+
+function resolveOutputAssetAddress(input: {
+  asset: string;
+  originChainId: number;
+  destinationChainId: number;
+  assets: Record<string, Record<number, Address>>;
+  inputToken: Address;
+}): Address {
+  const { asset, originChainId, destinationChainId, assets, inputToken } = input;
+
+  try {
+    return resolveAssetAddress(asset, destinationChainId, assets, undefined, originChainId);
+  } catch {
+    // Continue with canonical token inference from input token.
+  }
+
+  const sourceToken = tryResolveTokenByAddress(inputToken, originChainId);
+  if (sourceToken) {
+    try {
+      return resolveTokenAddress(sourceToken.symbol, destinationChainId);
+    } catch {
+      // Continue with bridge info/fallback path.
+    }
+
+    const bridged = resolveBridgedTokenAddress(
+      sourceToken.symbol,
+      originChainId,
+      destinationChainId
+    );
+    if (bridged) {
+      return bridged;
+    }
+  }
+
+  return resolveAssetAddress(asset, destinationChainId, assets, inputToken, originChainId);
+}
+
+async function resolveAcrossHandoffStatus(
+  input: Parameters<NonNullable<VenueAdapter["resolveHandoffStatus"]>>[0],
+  apiUrl?: string
+): Promise<{
+  status: "pending" | "settled" | "failed" | "expired";
+  settledAmount?: bigint;
+  reference?: string;
+  reason?: string;
+}> {
+  const reference = input.reference ?? input.originTxHash;
+  if (!reference) {
+    return { status: "pending" };
+  }
+
+  const base = apiUrl?.replace(/\/$/, "") ?? "https://app.across.to/api";
+  const candidates = input.originTxHash
+    ? [`${base}/deposits/status?txHash=${encodeURIComponent(input.originTxHash)}`]
+    : [`${base}/deposits/status?depositId=${encodeURIComponent(reference)}`];
+
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        continue;
+      }
+      const payload = (await response.json()) as Record<string, unknown>;
+      const statusText = String(
+        payload.status ?? payload.fillStatus ?? payload.state ?? payload.depositStatus ?? "pending"
+      ).toLowerCase();
+      if (
+        statusText === "settled" ||
+        statusText === "filled" ||
+        statusText === "completed" ||
+        statusText === "executed"
+      ) {
+        const settledAmount = toBigIntIfPossible(
+          payload.settledAmount ?? payload.outputAmount ?? payload.amountFilled ?? payload.amount
+        );
+        return {
+          status: "settled",
+          settledAmount,
+          reference:
+            (typeof payload.depositId === "string" && payload.depositId) ||
+            (typeof payload.id === "string" && payload.id) ||
+            reference,
+        };
+      }
+      if (statusText === "failed" || statusText === "cancelled" || statusText === "error") {
+        return {
+          status: "failed",
+          reference,
+          reason:
+            (typeof payload.reason === "string" && payload.reason) ||
+            (typeof payload.error === "string" && payload.error) ||
+            "Across bridge reported failure",
+        };
+      }
+      if (statusText === "expired") {
+        return {
+          status: "expired",
+          reference,
+          reason:
+            (typeof payload.reason === "string" && payload.reason) ||
+            "Across bridge deposit expired",
+        };
+      }
+      return { status: "pending", reference };
+    } catch {
+      /* status check failed — try next candidate URL */
+    }
+  }
+
+  return { status: "pending", reference };
+}

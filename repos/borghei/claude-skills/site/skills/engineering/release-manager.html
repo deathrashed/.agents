@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Release Manager - Claude Skills</title>
+  <meta name="description" content="Automates release management with changelog generation, semantic versioning, and release readiness checks. Use when preparing releases, generating changelogs, bumping versions, or validating release c">
+  <link rel="canonical" href="https://borghei.github.io/Claude-Skills/skills/engineering/release-manager.html">
+  <meta property="og:title" content="Release Manager - Claude Skills">
+  <meta property="og:description" content="Automates release management with changelog generation, semantic versioning, and release readiness checks. Use when preparing releases, generating changelogs, bumping versions, or validating release c">
+  <meta property="og:url" content="https://borghei.github.io/Claude-Skills/skills/engineering/release-manager.html">
+  <meta property="og:type" content="website">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Release Manager", "description": "Automates release management with changelog generation, semantic versioning, and release readiness checks. Use when preparing releases, generating changelogs, bumping versions, or validating release c...", "applicationCategory": "Engineering", "operatingSystem": "Any", "url": "https://borghei.github.io/Claude-Skills/skills/engineering/release-manager.html", "author": {"@type": "Person", "name": "borghei"}, "license": "https://opensource.org/licenses/MIT"}</script>
+  <style>
+:root {
+  --bg: #faf9f5;
+  --bg-secondary: #f0eee6;
+  --text: #141413;
+  --text-muted: #5e5d59;
+  --accent: #d97757;
+  --accent-deep: #c6613f;
+  --border: rgba(20,20,19,0.1);
+  --border-strong: rgba(20,20,19,0.18);
+  --white: #ffffff;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, monospace;
+  --max-width: 1200px;
+  --shadow-sm: 0 1px 2px rgba(20,20,19,0.04);
+  --shadow: 0 1px 3px rgba(20,20,19,0.06), 0 1px 2px rgba(20,20,19,0.04);
+  --shadow-md: 0 4px 12px rgba(20,20,19,0.08), 0 1px 3px rgba(20,20,19,0.06);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+a:hover { color: var(--accent-deep); }
+.container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+code { font-family: var(--font-mono); font-size: 0.875em; }
+
+/* Navbar */
+.navbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(250,249,245,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.navbar .container { display: flex; align-items: center; justify-content: space-between; }
+.nav-logo {
+  font-family: var(--font-serif); font-weight: 700; font-size: 1.1rem;
+  color: var(--text); letter-spacing: -0.01em;
+}
+.nav-logo:hover { color: var(--text); }
+.nav-links { display: flex; gap: 28px; align-items: center; }
+.nav-links a {
+  color: var(--text-muted); font-size: 0.9rem; font-weight: 500;
+  transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-links a.active { color: var(--accent); }
+.nav-links a.gh-link { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Breadcrumbs */
+.breadcrumbs { padding: 20px 0 0; font-size: 0.85rem; color: var(--text-muted); }
+.breadcrumbs a { color: var(--text-muted); }
+.breadcrumbs a:hover { color: var(--accent); }
+.breadcrumbs .sep { margin: 0 8px; opacity: 0.4; }
+
+/* Page header */
+.page-header { padding: 48px 0 32px; }
+.page-title {
+  font-family: var(--font-serif); font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 700; margin-bottom: 12px; letter-spacing: -0.02em;
+  color: var(--text);
+}
+.page-subtitle { color: var(--text-muted); max-width: 700px; font-size: 1.05rem; line-height: 1.6; }
+
+/* Count badge (inline with title) */
+.count-badge {
+  display: inline-block; font-family: var(--font-mono); font-size: 0.8rem;
+  color: var(--accent); background: rgba(217,119,87,0.08);
+  padding: 2px 10px; border-radius: 20px; margin-left: 8px;
+  vertical-align: middle; font-weight: 500;
+}
+
+/* Search + Filter */
+.filter-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+.search-input {
+  flex: 1; min-width: 200px; padding: 10px 14px 10px 38px;
+  background: var(--white); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); color: var(--text); font-family: var(--font-sans);
+  font-size: 0.9rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.1); }
+.search-input::placeholder { color: var(--text-muted); }
+.search-wrap { position: relative; flex: 1; min-width: 200px; }
+.search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.filter-select {
+  padding: 10px 14px; background: var(--white); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); color: var(--text); font-family: var(--font-sans);
+  font-size: 0.9rem; outline: none; cursor: pointer;
+}
+.filter-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.1); }
+
+/* Card grid */
+.skills-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-bottom: 60px; }
+.skill-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  display: flex; flex-direction: column;
+}
+.skill-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.skill-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; }
+.skill-card h3 a { color: var(--text); }
+.skill-card h3 a:hover { color: var(--accent); }
+.skill-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; flex: 1; }
+
+/* Badges */
+.badge-bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 6px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 0.7rem; padding: 3px 9px;
+  border-radius: 5px; font-weight: 500; white-space: nowrap;
+}
+.badge-domain { background: rgba(217,119,87,0.1); border: 1px solid rgba(217,119,87,0.2); color: var(--accent-deep); }
+.badge-subdomain { background: rgba(20,20,19,0.04); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-version { background: rgba(20,20,19,0.03); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-tools { background: rgba(20,20,19,0.04); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-refs { background: rgba(217,119,87,0.06); border: 1px solid rgba(217,119,87,0.15); color: var(--accent); }
+
+/* Tags */
+.skill-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tag {
+  font-family: var(--font-mono); font-size: 0.65rem; padding: 2px 8px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text-muted);
+}
+
+/* Example pills on domain summary cards */
+.example-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.example-pill {
+  font-family: var(--font-mono); font-size: 0.65rem; padding: 2px 7px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text-muted);
+}
+
+/* Skill detail page */
+.skill-detail { padding-bottom: 80px; }
+.skill-detail h2 {
+  font-family: var(--font-serif); font-size: 1.4rem; font-weight: 700;
+  margin: 40px 0 16px; padding-top: 16px;
+  border-top: 1px solid var(--border); color: var(--text);
+}
+.skill-detail h3 { font-size: 1.05rem; font-weight: 600; margin: 20px 0 10px; }
+.skill-detail p, .skill-detail li { font-size: 0.95rem; color: var(--text-muted); line-height: 1.7; }
+.skill-detail ul, .skill-detail ol { margin-left: 20px; margin-bottom: 16px; }
+.skill-detail li { margin-bottom: 6px; }
+.skill-detail pre {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; overflow-x: auto;
+  font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.7;
+  color: var(--text); margin: 12px 0 20px;
+}
+.skill-detail code {
+  font-family: var(--font-mono); font-size: 0.85rem;
+  background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px;
+}
+.skill-detail pre code { background: none; padding: 0; }
+
+/* Platform tabs */
+.platform-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+.tab-btn {
+  padding: 10px 18px; font-size: 0.85rem; font-weight: 500;
+  font-family: var(--font-sans); background: none; border: none;
+  border-bottom: 2px solid transparent; color: var(--text-muted);
+  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.tab-content pre {
+  border-top: none; border-radius: 0 0 var(--radius) var(--radius);
+  margin-top: 0;
+}
+
+/* Quick Start prompt cards */
+.prompt-cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  padding: 20px; background: var(--bg-secondary);
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+@media (max-width: 640px) { .prompt-cards { grid-template-columns: 1fr; } }
+.prompt-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.prompt-card-featured { border-color: var(--accent); border-width: 2px; }
+.prompt-card-header { display: flex; align-items: center; justify-content: space-between; }
+.prompt-card-header h3 { font-size: 1rem; font-weight: 700; margin: 0; color: var(--text); }
+.prompt-card-badge {
+  font-size: 0.7rem; font-weight: 600; padding: 3px 8px;
+  border-radius: 4px; background: var(--bg-secondary);
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-featured { background: rgba(217,119,87,0.12); color: var(--accent-deep); }
+.prompt-card-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.5; flex-grow: 1; }
+.copy-btn-featured { background: var(--accent-deep); }
+.prompt-details { margin-top: 4px; }
+.prompt-details summary {
+  font-size: 0.78rem; color: var(--text-muted); cursor: pointer;
+  padding: 4px 0; user-select: none;
+}
+.prompt-details summary:hover { color: var(--accent); }
+.copy-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; font-size: 0.82rem; font-weight: 600;
+  font-family: var(--font-sans);
+  background: var(--accent); color: var(--white);
+  border: none; border-radius: 6px; cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.copy-btn:hover { background: var(--accent-deep); }
+.copy-btn:active { transform: scale(0.97); }
+.copy-btn.copied { background: #2d8a4e; }
+.prompt-preview {
+  max-height: 200px; overflow-y: auto; padding: 16px 18px;
+  font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap;
+  word-wrap: break-word; color: var(--text-muted);
+  background: var(--white); margin: 0; border: none;
+  font-family: var(--font-mono);
+}
+.prompt-hint {
+  padding: 10px 18px; font-size: 0.78rem; color: var(--text-muted);
+  background: var(--bg-secondary); margin: 0; border-top: 1px solid var(--border);
+}
+
+/* Tools list */
+.tool-item {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px; margin-bottom: 10px;
+}
+.tool-item h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 3px; color: var(--text); }
+.tool-item p { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+
+/* Related skills */
+.related-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+
+/* Agents grid */
+.agents-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-bottom: 60px; }
+.agent-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.agent-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.agent-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.agent-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+.agent-card .view-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.8rem; margin-top: 10px; color: var(--accent);
+}
+
+/* Commands grid */
+.commands-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding-bottom: 60px; }
+.command-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.command-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.command-card h3 {
+  font-family: var(--font-mono); font-size: 0.95rem; font-weight: 600;
+  margin-bottom: 6px; color: var(--accent);
+}
+.command-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+.command-card .view-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.8rem; margin-top: 10px; color: var(--accent);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px; border-radius: var(--radius); font-size: 0.875rem;
+  font-weight: 500; font-family: var(--font-sans);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  text-decoration: none;
+}
+.btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn-primary:hover { background: #2a2a28; color: var(--bg); box-shadow: var(--shadow); }
+.btn-secondary { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.btn-secondary:hover { background: var(--bg-secondary); color: var(--text); box-shadow: var(--shadow-sm); }
+
+/* Section heading */
+.section-heading {
+  font-family: var(--font-serif); font-size: 1.25rem; font-weight: 700;
+  margin-bottom: 20px; color: var(--text);
+}
+
+/* Footer */
+.footer {
+  padding: 36px 0; border-top: 1px solid var(--border); margin-top: 40px;
+  background: var(--bg);
+}
+.footer-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.footer-links {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 0.85rem; color: var(--text-muted);
+}
+.footer-links a { color: var(--text-muted); }
+.footer-links a:hover { color: var(--accent); }
+.footer-sep { color: var(--border-strong); }
+.footer-credit { font-size: 0.85rem; color: var(--text-muted); }
+.footer-credit a { color: var(--text); font-weight: 600; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .skills-grid, .agents-grid, .related-grid { grid-template-columns: repeat(2, 1fr); }
+  .commands-grid { grid-template-columns: 1fr; }
+  .nav-links { gap: 16px; }
+  .platform-tabs { overflow-x: auto; }
+  .tab-btn { padding: 8px 12px; font-size: 0.8rem; white-space: nowrap; }
+}
+@media (max-width: 480px) {
+  .skills-grid, .agents-grid, .related-grid { grid-template-columns: 1fr; }
+  .filter-bar { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="https://borghei.github.io/Claude-Skills/" class="nav-logo">Claude Skills</a>
+    <div class="nav-links">
+      <a href="https://borghei.github.io/Claude-Skills/skills/" class="active">Skills</a>
+      <a href="https://borghei.github.io/Claude-Skills/agents/">Agents</a>
+      <a href="https://borghei.github.io/Claude-Skills/commands/">Commands</a>
+      <a href="https://github.com/borghei/Claude-Skills" target="_blank" rel="noopener" class="gh-link"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
+    </div>
+  </div>
+</nav>
+<div class="breadcrumbs container"><a href="https://borghei.github.io/Claude-Skills/">Home</a><span class=sep>/</span><a href="https://borghei.github.io/Claude-Skills/skills/">Skills</a><span class=sep>/</span><a href="https://borghei.github.io/Claude-Skills/skills/engineering/">Engineering</a><span class=sep>/</span><span>Release Manager</span></div>
+<main class="container">
+
+<article class="skill-detail">
+  <div class="page-header">
+    <h1 class="page-title">Release Manager</h1>
+    <p class="page-subtitle">Automates release management with changelog generation, semantic versioning, and release readiness checks. Use when preparing releases, generating changelogs, bumping versions, or validating release c...</p>
+    <div class="badge-bar"><span class="badge badge-domain">Engineering</span> <span class="badge badge-subdomain">Devops</span> <span class="badge badge-version">v1.0.0</span> <span class="badge badge-tools"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> 3 tools</span> <span class="badge badge-refs">references</span></div>
+    
+  </div>
+  <h2>How to Use</h2>
+<div class="platform-tabs">
+  <button class="tab-btn active" data-tab="quickstart">Quick Start</button>
+  <button class="tab-btn" data-tab="claude">Claude Code</button>
+  <button class="tab-btn" data-tab="codex">Codex</button>
+  <button class="tab-btn" data-tab="gemini">Gemini CLI</button>
+  <button class="tab-btn" data-tab="cursor">Cursor</button>
+  <button class="tab-btn" data-tab="manual">Manual</button>
+</div>
+<div class="tab-content active" id="tab-quickstart">
+  <div class="prompt-cards">
+    <div class="prompt-card">
+      <div class="prompt-card-header">
+        <h3>Try in Chat</h3>
+        <span class="prompt-card-badge">Quick</span>
+      </div>
+      <p class="prompt-card-desc">Paste into any AI chat for instant expertise. Works in one conversation -- no setup needed.</p>
+      <button class="copy-btn" onclick="copyPrompt(this)" data-prompt="You are an expert Release Manager (Engineering domain).
+
+Automates release management with changelog generation, semantic versioning, and release readiness checks. Use when preparing releases, generating changelogs, bumping versions, or validating release c...
+
+The agent automates release management by parsing conventional commits into structured changelogs, determining semantic version bumps, and assessing release readiness with checklists, rollback runbooks, and stakeholder communication plans. ```bash git log --oneline v1.0.0..HEAD | python changelog_ge
+
+## Your Key Capabilities
+- Generate Changelog and Version Bump
+- Assess Release Readiness
+- Hotfix Release
+- changelog_generator.py
+- version_bumper.py
+- release_planner.py
+
+## How to Help
+When the user asks for help in this domain:
+1. Ask clarifying questions to understand their context
+2. Apply the relevant framework or workflow from your expertise
+3. Provide actionable, specific output (not generic advice)
+4. Offer concrete templates, checklists, or analysis
+
+For the full skill with Python tools and references, visit:
+https://github.com/borghei/Claude-Skills/tree/main/release-manager
+
+---
+Start by asking the user what they need help with.">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> <span>Copy Prompt</span>
+      </button>
+      <details class="prompt-details">
+        <summary>Preview prompt</summary>
+        <pre class="prompt-preview">You are an expert Release Manager (Engineering domain).
+
+Automates release management with changelog generation, semantic versioning, and release readiness checks. Use when preparing releases, generating changelogs, bumping versions, or validating release c...
+
+The agent automates release management by parsing conventional commits into structured changelogs, determining semantic version bumps, and assessing release readiness with checklists, rollback runbooks, and stakeholder communication plans. ```bash git log --oneline v1.0.0..HEAD | python changelog_ge
+
+## Your Key Capabilities
+- Generate Changelog and Version Bump
+- Assess Release Readiness
+- Hotfix Release
+- changelog_generator.py
+- version_bumper.py
+- release_planner.py
+
+## How to Help
+When the user asks for help in this domain:
+1. Ask clarifying questions to understand their context
+2. Apply the relevant framework or workflow from your expertise
+3. Provide actionable, specific output (not generic advice)
+4. Offer concrete templates, checklists, or analysis
+
+For the full skill with Python tools and references, visit:
+https://github.com/borghei/Claude-Skills/tree/main/release-manager
+
+---
+Start by asking the user what they need help with.</pre>
+      </details>
+    </div>
+    <div class="prompt-card prompt-card-featured">
+      <div class="prompt-card-header">
+        <h3>Add to My AI</h3>
+        <span class="prompt-card-badge badge-featured">Full Skill</span>
+      </div>
+      <p class="prompt-card-desc">Creates a permanent Claude Project or Custom GPT with the complete skill. The AI will guide you through setup step by step.</p>
+      <button class="copy-btn copy-btn-featured" onclick="copyPrompt(this)" data-prompt="# Create a &quot;Release Manager&quot; AI Skill
+
+I want you to help me set up a reusable AI skill that I can use in future conversations. Read the complete skill definition below, then help me install it.
+
+## Complete Skill Definition
+
+# Release Manager
+
+The agent automates release management by parsing conventional commits into structured changelogs, determining semantic version bumps, and assessing release readiness with checklists, rollback runbooks, and stakeholder communication plans.
+
+## Quick Start
+
+```bash
+# Generate changelog from conventional commits
+git log --oneline v1.0.0..HEAD | python changelog_generator.py --version 1.1.0 --format both
+
+# Determine version bump from commit history
+git log --oneline v1.0.0..HEAD | python version_bumper.py --current-version 1.0.0 --analysis
+
+# Assess release readiness
+python release_planner.py --input release-plan.json --include-checklist --include-rollback
+```
+
+---
+
+## Core Workflows
+
+### Workflow 1: Generate Changelog and Version Bump
+
+1. Collect commits since last tag: `git log --oneline v1.0.0..HEAD`
+2. Pipe to `changelog_generator.py` to produce a Keep-a-Changelog-format CHANGELOG
+3. Pipe to `version_bumper.py` to determine MAJOR/MINOR/PATCH bump from commit types
+4. Review changelog grouping (Added, Fixed, Changed, Breaking Changes)
+5. **Validation checkpoint:** All `feat` commits appear under Added; all `fix` under Fixed; breaking changes highlighted
+
+```bash
+git log --oneline v1.2.0..HEAD | python changelog_generator.py \
+  --version 1.3.0 --date 2026-03-21 --base-url https://github.com/org/repo --summary
+```
+
+### Workflow 2: Assess Release Readiness
+
+1. Prepare release plan JSON with features, quality gates, stakeholders, and target date
+2. Run `release_planner.py` with checklist, communication, and rollback flags
+3. Review blocking issues and readiness score
+4. Address blockers (missing approvals, failed gates, overdue items)
+5. **Validation checkpoint:** Readiness score &gt;80%; zero blocking issues; rollback runbook generated with time estimates
+
+```bash
+python release_planner.py --input release-plan.json \
+  --output-format json --include-checklist --include-communication --include-rollback
+```
+
+### Workflow 3: Hotfix Release
+
+1. Create hotfix branch from last stable tag
+2. Apply minimal fix and run `version_bumper.py` with `--prerelease rc`
+3. Generate changelog entry for the fix
+4. Assess readiness with expedited checklist
+5. **Validation checkpoint:** Fix addresses root cause only; rollback procedure tested; stakeholders notified
+
+---
+
+## Version Bump Rules
+
+| Commit Type | Bump | Example |
+|-------------|------|---------|
+| `BREAKING CHANGE` or `!` suffix | MAJOR | `feat!: remove deprecated API` |
+| `feat` | MINOR | `feat(auth): add OAuth2` |
+| `fix`, `perf`, `security` | PATCH | `fix(api): resolve race condition` |
+| `docs`, `test`, `chore`, `ci` | None | `docs: update README` |
+
+Pre-release progression: `alpha.N` -&gt; `beta.1` -&gt; `rc.1` -&gt; stable release.
+
+---
+
+## Rollback Triggers
+
+- **Error rate:** &gt;2x baseline within 30 minutes
+- **Latency:** &gt;50% P95 increase
+- **Feature failures:** Core functionality broken
+- **Security incident:** Vulnerability exploited
+- **Data corruption:** Database integrity compromised
+
+---
+
+## Anti-Patterns
+
+- **Monolithic releases** -- large, infrequent releases with high blast radius; prefer small, frequent releases
+- **Manual deployments** -- error-prone and inconsistent; automate every step that can be automated
+- **No rollback plan** -- every release must have a tested rollback procedure before going live
+- **Skipping quality gates** -- deploying without test coverage, security scan, or dependency audit
+- **Last-minute changes** -- code freeze exists for a reason; changes after freeze need explicit approval
+- **Non-conventional commits** -- free-form commit messages break changelog generation and version bumping
+- **Environment drift** -- staging must mirror production; drift causes false confidence in testing
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| Changelog generator produces empty output | Non-conventional commit messages that don&#x27;t match the `type(scope): description` pattern | Ensure all commits follow conventional commit format; non-matching messages default to `chore` type which is excluded from user-facing changelogs |
+| Version bumper recommends `none` despite meaningful commits | Commits use types in the ignore list (`test`, `ci`, `build`, `chore`, `docs`, `style`) | Use `feat` for new features and `fix` for bug fixes; override with `--custom-rules` to map additional types to bump levels |
+| Release planner reports `blocked` status unexpectedly | Missing required approvals (`pm_approved`, `qa_approved`) on features or failed required quality gates | Review the `blocking_issues` array in the assessment output; ensure all features have the necessary approval flags set to `true` in the input JSON |
+| Pre-release version not incrementing correctly | Existing pre-release type does not match the requested `--prerelease` type, causing a reset to `.1` | When promoting from alpha to beta or beta to rc, the counter resets to 1 by design; to stay on the same track, pass the same pre-release type |
+| Git log parsing misses commits | Input uses full `git log` format but lines are not properly indented with 4 spaces | Use `git log --oneline` for the simplest input format, or ensure the full format output preserves the standard 4-space commit message indent |
+| Readiness score seems too low | Quality gates default to `pending` status when not explicitly set, and pending gates score zero points | Provide explicit `quality_gates` with accurate `status` values in the release plan JSON, or complete the gates before running assessment |
+| Rollback time estimate is inaccurate | Default rollback steps use generic time estimates that don&#x27;t reflect your infrastructure | Supply custom `rollback_steps` in the release plan JSON with `estimated_time` values that match your actual deployment environment |
+
+## Success Criteria
+
+- **Changelog accuracy**: 100% of conventional commits are correctly categorized (feat to Added, fix to Fixed, etc.) with zero miscategorized entries
+- **Version bump correctness**: Recommended version matches SemVer rules in all cases -- breaking changes produce MAJOR, features produce MINOR, fixes produce PATCH
+- **Readiness assessment coverage**: All blocking issues (missing approvals, failed quality gates, overdue timelines) are surfaced with zero false negatives
+- **Release cycle time reduction**: Teams using the planner reduce release preparation time by 40% or more compared to manual checklist tracking
+- **Rollback preparedness**: Every release assessed by the planner has a complete, actionable rollback runbook with time estimates and verification steps
+- **Stakeholder communication**: Communication plans cover all identified stakeholders with appropriate timing (T-48h external, T-24h internal, T+1h post-deploy)
+- **Tool integration time**: New teams can configure and run all three scripts against their repository within 30 minutes of initial setup
+
+## Scope &amp; Limitations
+
+**This skill covers:**
+- Parsing conventional commits and generating structured changelogs in Markdown and JSON formats
+- Determining semantic version bumps (major/minor/patch) with pre-release support (alpha, beta, rc)
+- Assessing release readiness across features, quality gates, approvals, and timelines
+- Generating rollback runbooks, communication plans, and release checklists from structured input
+
+**This skill does NOT cover:**
+- Actual CI/CD pipeline execution or deployment automation (see `engineering/ci-cd-pipeline-generator`)
+- Live monitoring, alerting, or incident response during deployments (see `engineering/monitoring-alerting-setup`)
+- Code review processes or pull request management (see `engineering/code-review-automation`)
+- Infrastructure provisioning, container orchestration, or environment management (see `engineering/infrastructure-as-code`)
+
+## Integration Points
+
+| Skill | Integration | Data Flow |
+|-------|-------------|-----------|
+| `engineering/ci-cd-pipeline-generator` | Embed changelog generation and version bumping as pipeline stages | Git log output flows into `changelog_generator.py`; version bump output feeds pipeline tagging steps |
+| `engineering/code-review-automation` | Validate that PR commits follow conventional commit format before merge | Commit messages validated upstream ensure clean input for changelog generation |
+| `engineering/monitoring-alerting-setup` | Define rollback triggers based on monitoring thresholds from the rollback runbook | Rollback trigger thresholds (error rate &gt;2x, latency &gt;50%) feed into alert rule configuration |
+| `engineering/api-design-reviewer` | Breaking API changes flagged by the reviewer map to MAJOR version bumps | API review findings populate `breaking_changes` arrays in the release plan JSON |
+| `engineering/infrastructure-as-code` | Deployment steps in the rollback runbook reference infrastructure rollback commands | Rollback runbook `command` fields contain infrastructure-specific commands (kubectl, DNS, load balancer) |
+| `project-management/release-planning` | Release plan JSON structure aligns with PM release tracking artifacts | PM feature lists and approval statuses feed directly into `release_planner.py` input format |
+
+## Tool Reference
+
+### changelog_generator.py
+
+**Purpose:** Parses git log output in conventional commit format and generates structured changelogs. Groups commits by type (Added, Fixed, Changed, etc.), extracts scope and issue references, and highlights breaking changes.
+
+**Usage:**
+```bash
+git log --oneline v1.0.0..HEAD | python changelog_generator.py
+python changelog_generator.py --input commits.txt --version 2.0.0 --format json
+cat commits.json | python changelog_generator.py --input-format json --summary
+```
+
+**Flags/Parameters:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--input` | `-i` | string | stdin | Input file path; reads from stdin if omitted |
+| `--format` | `-f` | choice | `markdown` | Output format: `markdown`, `json`, or `both` |
+| `--version` | `-v` | string | `Unreleased` | Version label for the changelog section header |
+| `--date` | `-d` | string | today | Release date in YYYY-MM-DD format |
+| `--base-url` | `-u` | string | empty | Base repository URL for commit links (e.g., `https://github.com/org/repo`) |
+| `--input-format` | | choice | `git-log` | Input format: `git-log` (oneline or full) or `json` (array of commit objects) |
+| `--output` | `-o` | string | stdout | Output file path; prints to stdout if omitted |
+| `--summary` | `-s` | flag | false | Append release summary statistics (total commits, by type, breaking changes, issue references) |
+
+**Example:**
+```bash
+git log --oneline v1.2.0..HEAD | python changelog_generator.py \
+  --version 1.3.0 \
+  --date 2026-03-21 \
+  --base-url https://github.com/myorg/myapp \
+  --format both \
+  --summary
+```
+
+**Output Formats:**
+- **markdown**: Keep a Changelog format with sections for Breaking Changes, Added, Changed, Deprecated, Removed, Fixed, Security. Commits grouped by scope within each section.
+- **json**: Structured object with `version`, `date`, `summary` (counts by type, by author, scopes, issue references), and `categories` (arrays of commit objects per category).
+- **both**: Markdown changelog followed by JSON output, each with a heading separator.
+
+---
+
+### version_bumper.py
+
+**Purpose:** Analyzes conventional commits since the last tag to determine the correct semantic version bump (major/minor/patch). Supports pre-release versions (alpha, beta, rc) and generates version bump commands for npm, Python, Rust, Git, and Docker.
+
+**Usage:**
+```bash
+git log --oneline v1.2.0..HEAD | python version_bumper.py --current-version 1.2.0
+python version_bumper.py -c 2.0.0-beta.3 -i commits.json --input-format json --prerelease rc
+git log --oneline v1.0.0..HEAD | python version_bumper.py -c 1.0.0 -f json --analysis --include-commands
+```
+
+**Flags/Parameters:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--current-version` | `-c` | string | **required** | Current version (e.g., `1.2.3`, `v1.2.3`, `1.0.0-beta.2`) |
+| `--input` | `-i` | string | stdin | Input file with commits; reads from stdin if omitted |
+| `--input-format` | | choice | `git-log` | Input format: `git-log` (oneline) or `json` (array of commit objects) |
+| `--prerelease` | `-p` | choice | none | Generate pre-release version: `alpha`, `beta`, or `rc` |
+| `--output-format` | `-f` | choice | `text` | Output format: `text`, `json`, or `commands` |
+| `--output` | `-o` | string | stdout | Output file path; prints to stdout if omitted |
+| `--include-commands` | | flag | false | Include version bump commands for npm, Python, Rust, Git, and Docker |
+| `--include-files` | | flag | false | Include file update snippets for package.json, pyproject.toml, setup.py, Cargo.toml, __init__.py |
+| `--custom-rules` | | string | none | JSON string mapping commit types to bump levels (e.g., `&#x27;{&quot;perf&quot;: &quot;minor&quot;}&#x27;`) |
+| `--ignore-types` | | string | `test,ci,build,chore,docs,style` | Comma-separated list of commit types to ignore for bump determination |
+| `--analysis` | `-a` | flag | false | Include detailed commit analysis (breaking changes list, features list, fixes list, ignored list) |
+
+**Example:**
+```bash
+git log --oneline v2.1.0..HEAD | python version_bumper.py \
+  --current-version 2.1.0 \
+  --output-format json \
+  --analysis \
+  --include-commands \
+  --include-files
+```
+
+**Output Formats:**
+- **text**: Human-readable summary with current version, recommended version, bump type, and optional analysis/commands.
+- **json**: Structured object with `current_version`, `recommended_version`, `bump_type`, and optional `analysis`, `commands`, and `file_updates` fields.
+- **commands**: Shell-ready version bump commands organized by platform (npm, Python, Rust, Git, Docker).
+
+---
+
+### release_planner.py
+
+**Purpose:** Takes a release plan JSON (features, quality gates, stakeholders, target date) and assesses release readiness. Generates a readiness report with scoring, a release checklist, a stakeholder communication plan with message templates, and a rollback runbook.
+
+**Usage:**
+```bash
+python release_planner.py --input release-plan.json
+python release_planner.py -i plan.json -f json --include-checklist --include-rollback
+python release_planner.py -i plan.json -f markdown --include-checklist --include-communication --include-rollback
+```
+
+**Flags/Parameters:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--input` | `-i` | string | **required** | Path to release plan JSON file |
+| `--output-format` | `-f` | choice | `text` | Output format: `json`, `markdown`, or `text` |
+| `--output` | `-o` | string | stdout | Output file path; prints to stdout if omitted |
+| `--include-checklist` | | flag | false | Include the full release checklist (pre-release validation, quality gates, approvals, documentation, deployment) |
+| `--include-communication` | | flag | false | Include stakeholder communication plan with timeline and message templates |
+| `--include-rollback` | | flag | false | Include rollback runbook with step-by-step procedures, triggers, and verification checks |
+| `--min-coverage` | | float | `80.0` | Minimum test coverage threshold percentage for quality gate validation |
+
+**Example:**
+```bash
+python release_planner.py \
+  --input release-plan.json \
+  --output-format json \
+  --output readiness-report.json \
+  --include-checklist \
+  --include-communication \
+  --include-rollback \
+  --min-coverage 85.0
+```
+
+**Input JSON Structure:**
+The input file expects a JSON object with keys: `release_name`, `version`, `target_date` (ISO format), `features` (array of feature objects with `id`, `title`, `type`, `status`, `risk_level`, approvals, etc.), `quality_gates` (optional array), `stakeholders` (optional array), and `rollback_steps` (optional array). When `quality_gates` or `rollback_steps` are omitted, sensible defaults are generated automatically.
+
+**Output Formats:**
+- **text**: Plain text report with status, readiness score, blocking issues, warnings, recommendations, feature summary, and quality gate summary.
+- **markdown**: Formatted Markdown report with headings, status icons, and structured feature/checklist sections.
+- **json**: Complete structured object with `assessment`, `checklist`, `communication_plan`, and `rollback_runbook` fields (null when not requested).
+
+---
+
+## What I Need You to Do
+
+First, detect which platform I&#x27;m using (Claude.ai, ChatGPT, etc.) and follow the matching instructions below.
+
+### If I&#x27;m on Claude.ai:
+
+Walk me through these exact steps:
+
+1. **Create the Project:** Tell me to go to **claude.ai &gt; Projects &gt; Create project** and name it **&quot;Release Manager&quot;**
+
+2. **Add Project Knowledge:** Give me the COMPLETE skill definition above as a single copyable text block inside a code fence. Tell me to click **&quot;Add content&quot; &gt; &quot;Add text content&quot;** inside the project, then paste that entire block. Do NOT say &quot;paste from above&quot; -- give me the actual text to copy right there.
+
+3. **Set Custom Instructions:** Tell me to open project settings and paste this exact instruction:
+   &quot;You are an expert Release Manager in the Engineering domain. Use the project knowledge as your expertise. Follow the workflows, frameworks, and templates defined there. Always provide specific, actionable output.&quot;
+
+4. **Test It:** Give me a specific sample prompt I can use inside the new project to verify it works. Pick a real task from the skill&#x27;s workflows.
+
+### If I&#x27;m on ChatGPT:
+
+Walk me through these exact steps:
+
+1. **Create a Custom GPT:** Tell me to go to **chatgpt.com &gt; Explore GPTs &gt; Create**
+2. **Configure it:**
+   - Name: **&quot;Release Manager&quot;**
+   - Description: &quot;Automates release management with changelog generation, semantic versioning, and release readiness checks. Use when preparing releases, generating changelogs, bumping versions, or validating release c...&quot;
+   - Instructions: Give me the COMPLETE skill definition above as a single copyable text block inside a code fence to paste into the Instructions field. Do NOT say &quot;paste from above.&quot;
+3. **Test It:** Give me a sample prompt to verify it works.
+
+### If I&#x27;m on another platform:
+Ask which tool I&#x27;m using and adapt the instructions accordingly.
+
+## Important
+- Always provide the full skill text in a ready-to-copy code block -- never tell me to &quot;scroll up&quot; or &quot;copy from above&quot;
+- Keep the setup steps simple and numbered
+- After setup, test it with me using a real workflow from the skill
+
+Source: https://github.com/borghei/Claude-Skills/tree/main/engineering/release-manager/SKILL.md">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> <span>Copy &amp; Create Skill</span>
+      </button>
+      <details class="prompt-details">
+        <summary>Preview prompt</summary>
+        <pre class="prompt-preview"># Create a &quot;Release Manager&quot; AI Skill
+
+I want you to help me set up a reusable AI skill that I can use in future conversations. Read the complete skill definition below, then help me install it.
+
+## Complete Skill Definition
+
+# Release Manager
+
+The agent automates release management by parsing conventional commits into structured changelogs, determining semantic version bumps, and assessing release readiness with checklists, rollback runbooks, and stakeholder communication plans.
+
+## Quick Start
+
+```bash
+# Generate changelog from conventional commits
+git log --oneline v1.0.0..HEAD | python changelog_generator.py --version 1.1.0 --format both
+
+# Determine version bump from commit history
+git log --oneline v1.0.0..HEAD | python version_bumper.py --current-version 1.0.0 --analysis
+
+# Assess release readiness
+python release_planner.py --input release-plan.json --include-checklist --include-rollback
+```
+
+---
+
+## Core Workflows
+
+### Workflow 1: Generate Changelog and Version Bump
+
+1. Collect commits since last tag: `git log --oneline v1.0.0..HEAD`
+2. Pipe to `changelog_generator.py` to produce a Keep-a-Changelog-format CHANGELOG
+3. Pipe to `version_bumper.py` to determine MAJOR/MINOR/PATCH bump from commit types
+4. Review changelog grouping (Added, Fixed, Changed, Breaking Changes)
+5. **Validation checkpoint:** All `feat` commits appear under Added; all `fix` under Fixed; breaking changes highlighted
+
+```bash
+git log --oneline v1.2.0..HEAD | python changelog_generator.py \
+  --version 1.3.0 --date 2026-03-21 --base-url https://github.com/org/repo --summary
+```
+
+### Workflow 2: Assess Release Readiness
+
+1. Prepare release plan JSON with features, quality gates, stakeholders, and target date
+2. Run `release_planner.py` with checklist, communication, and rollback flags
+3. Review blocking issues and readiness score
+4. Address blockers (missing approvals, failed gates, overdue items)
+5. **Validation checkpoint:** Readiness score &gt;80%; zero blocking issues; rollback runbook generated with time estimates
+
+```bash
+python release_planner.py --input release-plan.json \
+  --output-format json --include-checklist --include-communication --include-rollback
+```
+
+### Workflow 3: Hotfix Release
+
+1. Create hotfix branch from last stable tag
+2. Apply minimal fix and run `version_bumper.py` with `--prerelease rc`
+3. Generate changelog entry for the fix
+4. Assess readiness with expedited checklist
+5. **Validation checkpoint:** Fix addresses root cause only; rollback procedure tested; stakeholders notified
+
+---
+
+## Version Bump Rules
+
+| Commit Type | Bump | Example |
+|-------------|------|---------|
+| `BREAKING CHANGE` or `!` suffix | MAJOR | `feat!: remove deprecated API` |
+| `feat` | MINOR | `feat(auth): add OAuth2` |
+| `fix`, `perf`, `security` | PATCH | `fix(api): resolve race condition` |
+| `docs`, `test`, `chore`, `ci` | None | `docs: update README` |
+
+Pre-release progression: `alpha.N` -&gt; `beta.1` -&gt; `rc.1` -&gt; stable release.
+
+---
+
+## Rollback Triggers
+
+- **Error rate:** &gt;2x baseline within 30 minutes
+- **Latency:** &gt;50% P95 increase
+- **Feature failures:** Core functionality broken
+- **Security incident:** Vulnerability exploited
+- **Data corruption:** Database integrity compromised
+
+---
+
+## Anti-Patterns
+
+- **Monolithic releases** -- large, infrequent releases with high blast radius; prefer small, frequent releases
+- **Manual deployments** -- error-prone and inconsistent; automate every step that can be automated
+- **No rollback plan** -- every release must have a tested rollback procedure before going live
+- **Skipping quality gates** -- deploying without test coverage, security scan, or dependency audit
+- **Last-minute changes** -- code freeze exists for a reason; changes after freeze need explicit approval
+- **Non-conventional commits** -- free-form commit messages break changelog generation and version bumping
+- **Environment drift** -- staging must mirror production; drift causes false confidence in testing
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| Changelog generator produces empty output | Non-conventional commit messages that don&#x27;t match the `type(scope): description` pattern | Ensure all commits follow conventional commit format; non-matching messages default to `chore` type which is excluded from user-facing changelogs |
+| Version bumper recommends `none` despite meaningful commits | Commits use types in the ignore list (`test`, `ci`, `build`, `chore`, `docs`, `style`) | Use `feat` for new features and `fix` for bug fixes; override with `--custom-rules` to map additional types to bump levels |
+| Release planner reports `blocked` status unexpectedly | Missing required approvals (`pm_approved`, `qa_approved`) on features or failed required quality gates | Review the `blocking_issues` array in the assessment output; ensure all features have the necessary approval flags set to `true` in the input JSON |
+| Pre-release version not incrementing correctly | Existing pre-release type does not match the requested `--prerelease` type, causing a reset to `.1` | When promoting from alpha to beta or beta to rc, the counter resets to 1 by design; to stay on the same track, pass the same pre-release type |
+| Git log parsing misses commits | Input uses full `git log` format but lines are not properly indented with 4 spaces | Use `git log --oneline` for the simplest input format, or ensure the full format output preserves the standard 4-space commit message indent |
+| Readiness score seems too low | Quality gates default to `pending` status when not explicitly set, and pending gates score zero points | Provide explicit `quality_gates` with accurate `status` values in the release plan JSON, or complete the gates before running assessment |
+| Rollback time estimate is inaccurate | Default rollback steps use generic time estimates that don&#x27;t reflect your infrastructure | Supply custom `rollback_steps` in the release plan JSON with `estimated_time` values that match your actual deployment environment |
+
+## Success Criteria
+
+- **Changelog accuracy**: 100% of conventional commits are correctly categorized (feat to Added, fix to Fixed, etc.) with zero miscategorized entries
+- **Version bump correctness**: Recommended version matches SemVer rules in all cases -- breaking changes produce MAJOR, features produce MINOR, fixes produce PATCH
+- **Readiness assessment coverage**: All blocking issues (missing approvals, failed quality gates, overdue timelines) are surfaced with zero false negatives
+- **Release cycle time reduction**: Teams using the planner reduce release preparation time by 40% or more compared to manual checklist tracking
+- **Rollback preparedness**: Every release assessed by the planner has a complete, actionable rollback runbook with time estimates and verification steps
+- **Stakeholder communication**: Communication plans cover all identified stakeholders with appropriate timing (T-48h external, T-24h internal, T+1h post-deploy)
+- **Tool integration time**: New teams can configure and run all three scripts against their repository within 30 minutes of initial setup
+
+## Scope &amp; Limitations
+
+**This skill covers:**
+- Parsing conventional commits and generating structured changelogs in Markdown and JSON formats
+- Determining semantic version bumps (major/minor/patch) with pre-release support (alpha, beta, rc)
+- Assessing release readiness across features, quality gates, approvals, and timelines
+- Generating rollback runbooks, communication plans, and release checklists from structured input
+
+**This skill does NOT cover:**
+- Actual CI/CD pipeline execution or deployment automation (see `engineering/ci-cd-pipeline-generator`)
+- Live monitoring, alerting, or incident response during deployments (see `engineering/monitoring-alerting-setup`)
+- Code review processes or pull request management (see `engineering/code-review-automation`)
+- Infrastructure provisioning, container orchestration, or environment management (see `engineering/infrastructure-as-code`)
+
+## Integration Points
+
+| Skill | Integration | Data Flow |
+|-------|-------------|-----------|
+| `engineering/ci-cd-pipeline-generator` | Embed changelog generation and version bumping as pipeline stages | Git log output flows into `changelog_generator.py`; version bump output feeds pipeline tagging steps |
+| `engineering/code-review-automation` | Validate that PR commits follow conventional commit format before merge | Commit messages validated upstream ensure clean input for changelog generation |
+| `engineering/monitoring-alerting-setup` | Define rollback triggers based on monitoring thresholds from the rollback runbook | Rollback trigger thresholds (error rate &gt;2x, latency &gt;50%) feed into alert rule configuration |
+| `engineering/api-design-reviewer` | Breaking API changes flagged by the reviewer map to MAJOR version bumps | API review findings populate `breaking_changes` arrays in the release plan JSON |
+| `engineering/infrastructure-as-code` | Deployment steps in the rollback runbook reference infrastructure rollback commands | Rollback runbook `command` fields contain infrastructure-specific commands (kubectl, DNS, load balancer) |
+| `project-management/release-planning` | Release plan JSON structure aligns with PM release tracking artifacts | PM feature lists and approval statuses feed directly into `release_planner.py` input format |
+
+## Tool Reference
+
+### changelog_generator.py
+
+**Purpose:** Parses git log output in conventional commit format and generates structured changelogs. Groups commits by type (Added, Fixed, Changed, etc.), extracts scope and issue references, and highlights breaking changes.
+
+**Usage:**
+```bash
+git log --oneline v1.0.0..HEAD | python changelog_generator.py
+python changelog_generator.py --input commits.txt --version 2.0.0 --format json
+cat commits.json | python changelog_generator.py --input-format json --summary
+```
+
+**Flags/Parameters:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--input` | `-i` | string | stdin | Input file path; reads from stdin if omitted |
+| `--format` | `-f` | choice | `markdown` | Output format: `markdown`, `json`, or `both` |
+| `--version` | `-v` | string | `Unreleased` | Version label for the changelog section header |
+| `--date` | `-d` | string | today | Release date in YYYY-MM-DD format |
+| `--base-url` | `-u` | string | empty | Base repository URL for commit links (e.g., `https://github.com/org/repo`) |
+| `--input-format` | | choice | `git-log` | Input format: `git-log` (oneline or full) or `json` (array of commit objects) |
+| `--output` | `-o` | string | stdout | Output file path; prints to stdout if omitted |
+| `--summary` | `-s` | flag | false | Append release summary statistics (total commits, by type, breaking changes, issue references) |
+
+**Example:**
+```bash
+git log --oneline v1.2.0..HEAD | python changelog_generator.py \
+  --version 1.3.0 \
+  --date 2026-03-21 \
+  --base-url https://github.com/myorg/myapp \
+  --format both \
+  --summary
+```
+
+**Output Formats:**
+- **markdown**: Keep a Changelog format with sections for Breaking Changes, Added, Changed, Deprecated, Removed, Fixed, Security. Commits grouped by scope within each section.
+- **json**: Structured object with `version`, `date`, `summary` (counts by type, by author, scopes, issue references), and `categories` (arrays of commit objects per category).
+- **both**: Markdown changelog followed by JSON output, each with a heading separator.
+
+---
+
+### version_bumper.py
+
+**Purpose:** Analyzes conventional commits since the last tag to determine the correct semantic version bump (major/minor/patch). Supports pre-release versions (alpha, beta, rc) and generates version bump commands for npm, Python, Rust, Git, and Docker.
+
+**Usage:**
+```bash
+git log --oneline v1.2.0..HEAD | python version_bumper.py --current-version 1.2.0
+python version_bumper.py -c 2.0.0-beta.3 -i commits.json --input-format json --prerelease rc
+git log --oneline v1.0.0..HEAD | python version_bumper.py -c 1.0.0 -f json --analysis --include-commands
+```
+
+**Flags/Parameters:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--current-version` | `-c` | string | **required** | Current version (e.g., `1.2.3`, `v1.2.3`, `1.0.0-beta.2`) |
+| `--input` | `-i` | string | stdin | Input file with commits; reads from stdin if omitted |
+| `--input-format` | | choice | `git-log` | Input format: `git-log` (oneline) or `json` (array of commit objects) |
+| `--prerelease` | `-p` | choice | none | Generate pre-release version: `alpha`, `beta`, or `rc` |
+| `--output-format` | `-f` | choice | `text` | Output format: `text`, `json`, or `commands` |
+| `--output` | `-o` | string | stdout | Output file path; prints to stdout if omitted |
+| `--include-commands` | | flag | false | Include version bump commands for npm, Python, Rust, Git, and Docker |
+| `--include-files` | | flag | false | Include file update snippets for package.json, pyproject.toml, setup.py, Cargo.toml, __init__.py |
+| `--custom-rules` | | string | none | JSON string mapping commit types to bump levels (e.g., `&#x27;{&quot;perf&quot;: &quot;minor&quot;}&#x27;`) |
+| `--ignore-types` | | string | `test,ci,build,chore,docs,style` | Comma-separated list of commit types to ignore for bump determination |
+| `--analysis` | `-a` | flag | false | Include detailed commit analysis (breaking changes list, features list, fixes list, ignored list) |
+
+**Example:**
+```bash
+git log --oneline v2.1.0..HEAD | python version_bumper.py \
+  --current-version 2.1.0 \
+  --output-format json \
+  --analysis \
+  --include-commands \
+  --include-files
+```
+
+**Output Formats:**
+- **text**: Human-readable summary with current version, recommended version, bump type, and optional analysis/commands.
+- **json**: Structured object with `current_version`, `recommended_version`, `bump_type`, and optional `analysis`, `commands`, and `file_updates` fields.
+- **commands**: Shell-ready version bump commands organized by platform (npm, Python, Rust, Git, Docker).
+
+---
+
+### release_planner.py
+
+**Purpose:** Takes a release plan JSON (features, quality gates, stakeholders, target date) and assesses release readiness. Generates a readiness report with scoring, a release checklist, a stakeholder communication plan with message templates, and a rollback runbook.
+
+**Usage:**
+```bash
+python release_planner.py --input release-plan.json
+python release_planner.py -i plan.json -f json --include-checklist --include-rollback
+python release_planner.py -i plan.json -f markdown --include-checklist --include-communication --include-rollback
+```
+
+**Flags/Parameters:**
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--input` | `-i` | string | **required** | Path to release plan JSON file |
+| `--output-format` | `-f` | choice | `text` | Output format: `json`, `markdown`, or `text` |
+| `--output` | `-o` | string | stdout | Output file path; prints to stdout if omitted |
+| `--include-checklist` | | flag | false | Include the full release checklist (pre-release validation, quality gates, approvals, documentation, deployment) |
+| `--include-communication` | | flag | false | Include stakeholder communication plan with timeline and message templates |
+| `--include-rollback` | | flag | false | Include rollback runbook with step-by-step procedures, triggers, and verification checks |
+| `--min-coverage` | | float | `80.0` | Minimum test coverage threshold percentage for quality gate validation |
+
+**Example:**
+```bash
+python release_planner.py \
+  --input release-plan.json \
+  --output-format json \
+  --output readiness-report.json \
+  --include-checklist \
+  --include-communication \
+  --include-rollback \
+  --min-coverage 85.0
+```
+
+**Input JSON Structure:**
+The input file expects a JSON object with keys: `release_name`, `version`, `target_date` (ISO format), `features` (array of feature objects with `id`, `title`, `type`, `status`, `risk_level`, approvals, etc.), `quality_gates` (optional array), `stakeholders` (optional array), and `rollback_steps` (optional array). When `quality_gates` or `rollback_steps` are omitted, sensible defaults are generated automatically.
+
+**Output Formats:**
+- **text**: Plain text report with status, readiness score, blocking issues, warnings, recommendations, feature summary, and quality gate summary.
+- **markdown**: Formatted Markdown report with headings, status icons, and structured feature/checklist sections.
+- **json**: Complete structured object with `assessment`, `checklist`, `communication_plan`, and `rollback_runbook` fields (null when not requested).
+
+---
+
+## What I Need You to Do
+
+First, detect which platform I&#x27;m using (Claude.ai, ChatGPT, etc.) and follow the matching instructions below.
+
+### If I&#x27;m on Claude.ai:
+
+Walk me through these exact steps:
+
+1. **Create the Project:** Tell me to go to **claude.ai &gt; Projects &gt; Create project** and name it **&quot;Release Manager&quot;**
+
+2. **Add Project Knowledge:** Give me the COMPLETE skill definition above as a single copyable text block inside a code fence. Tell me to click **&quot;Add content&quot; &gt; &quot;Add text content&quot;** inside the project, then paste that entire block. Do NOT say &quot;paste from above&quot; -- give me the actual text to copy right there.
+
+3. **Set Custom Instructions:** Tell me to open project settings and paste this exact instruction:
+   &quot;You are an expert Release Manager in the Engineering domain. Use the project knowledge as your expertise. Follow the workflows, frameworks, and templates defined there. Always provide specific, actionable output.&quot;
+
+4. **Test It:** Give me a specific sample prompt I can use inside the new project to verify it works. Pick a real task from the skill&#x27;s workflows.
+
+### If I&#x27;m on ChatGPT:
+
+Walk me through these exact steps:
+
+1. **Create a Custom GPT:** Tell me to go to **chatgpt.com &gt; Explore GPTs &gt; Create**
+2. **Configure it:**
+   - Name: **&quot;Release Manager&quot;**
+   - Description: &quot;Automates release management with changelog generation, semantic versioning, and release readiness checks. Use when preparing releases, generating changelogs, bumping versions, or validating release c...&quot;
+   - Instructions: Give me the COMPLETE skill definition above as a single copyable text block inside a code fence to paste into the Instructions field. Do NOT say &quot;paste from above.&quot;
+3. **Test It:** Give me a sample prompt to verify it works.
+
+### If I&#x27;m on another platform:
+Ask which tool I&#x27;m using and adapt the instructions accordingly.
+
+## Important
+- Always provide the full skill text in a ready-to-copy code block -- never tell me to &quot;scroll up&quot; or &quot;copy from above&quot;
+- Keep the setup steps simple and numbered
+- After setup, test it with me using a real workflow from the skill
+
+Source: https://github.com/borghei/Claude-Skills/tree/main/engineering/release-manager/SKILL.md</pre>
+      </details>
+    </div>
+  </div>
+</div>
+<div class="tab-content" id="tab-claude">
+  <pre><code># Add to your project
+cs install engineering/release-manager ./
+
+# Or copy directly
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/release-manager your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-codex">
+  <pre><code># The skill is available in your Codex workspace at:
+.codex/skills/release-manager/
+
+# Reference the SKILL.md in your Codex instructions
+# or copy it into your project:
+cp -r .codex/skills/release-manager your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-gemini">
+  <pre><code># The skill is available in your Gemini CLI workspace at:
+.gemini/skills/release-manager/
+
+# Reference the SKILL.md in your Gemini instructions
+# or copy it into your project:
+cp -r .gemini/skills/release-manager your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-cursor">
+  <pre><code># Add to your .cursorrules or workspace settings:
+# Reference: engineering/release-manager/SKILL.md
+
+# Or copy the skill folder into your project:
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/release-manager your-project/</code></pre>
+</div>
+<div class="tab-content" id="tab-manual">
+  <pre><code># Clone and copy
+git clone https://github.com/borghei/Claude-Skills.git
+cp -r Claude-Skills/engineering/release-manager your-project/
+
+# Or download just this skill
+curl -sL https://github.com/borghei/Claude-Skills/archive/main.tar.gz | tar xz --strip=1 Claude-Skills-main/engineering/release-manager</code></pre>
+</div>
+<h3>Run Python Tools</h3>
+<pre><code>python engineering/release-manager/scripts/tool_name.py --help</code></pre>
+  
+  <h2>Quick Start</h2><pre><code># Generate changelog from conventional commits
+git log --oneline v1.0.0..HEAD | python changelog_generator.py --version 1.1.0 --format both
+
+# Determine version bump from commit history
+git log --oneline v1.0.0..HEAD | python version_bumper.py --current-version 1.0.0 --analysis
+
+# Assess release readiness
+python release_planner.py --input release-plan.json --include-checklist --include-rollback
+</code></pre>
+
+---
+  <h2>Related Skills in Engineering</h2><div class="related-grid"><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-designer.html" class="skill-card" style="text-decoration:none"><h3>Agent Designer</h3><p>Designs multi-agent system architectures with orchestration patterns, tool schemas, and...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-protocol.html" class="skill-card" style="text-decoration:none"><h3>Agent Protocol</h3><p>Design and implement AI agent communication protocols including MCP tool schemas, Google A2A...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/agent-workflow-designer.html" class="skill-card" style="text-decoration:none"><h3>Agent Workflow Designer</h3><p>Design and implement multi-agent orchestration systems with workflow DAGs, agent routing,...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/api-design-reviewer.html" class="skill-card" style="text-decoration:none"><h3>Api Design Reviewer</h3><p>Reviews REST API designs for quality, consistency, and breaking changes. Lints OpenAPI specs,...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/api-test-suite-builder.html" class="skill-card" style="text-decoration:none"><h3>Api Test Suite Builder</h3><p>Generate comprehensive API test suites from route definitions across frameworks. Covers auth...</p></a><a href="https://borghei.github.io/Claude-Skills/skills/engineering/aws-solution-architect.html" class="skill-card" style="text-decoration:none"><h3>Aws Solution Architect</h3><p>Design AWS architectures for startups using serverless patterns and IaC templates. Use when...</p></a></div>
+  <p style="margin-top:32px"><a href="https://github.com/borghei/Claude-Skills/tree/main/engineering/release-manager/SKILL.md" target="_blank" rel="noopener" class="btn btn-secondary">View on GitHub <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a></p>
+</article>
+</main>
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-links">
+      <a href="https://github.com/borghei/Claude-Skills" target="_blank" rel="noopener">GitHub</a>
+      <span class="footer-sep">&middot;</span>
+      <span>MIT + Commons Clause</span>
+      <span class="footer-sep">&middot;</span>
+      <a href="https://buymeacoffee.com/borghei" target="_blank" rel="noopener">Buy Me a Coffee</a>
+    </div>
+    <div class="footer-credit">Built by <a href="https://github.com/borghei" target="_blank" rel="noopener">borghei</a></div>
+  </div>
+</footer>
+<script>
+document.querySelectorAll('.tab-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+    document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active')});
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+function copyPrompt(btn){
+  var text=btn.getAttribute('data-prompt');
+  // Decode HTML entities
+  var ta=document.createElement('textarea');
+  ta.innerHTML=text;
+  text=ta.value;
+  navigator.clipboard.writeText(text).then(function(){
+    btn.classList.add('copied');
+    btn.querySelector('span').textContent='Copied!';
+    setTimeout(function(){
+      btn.classList.remove('copied');
+      btn.querySelector('span').textContent='Copy Prompt';
+    },2000);
+  });
+}
+</script>
+</body>
+</html>

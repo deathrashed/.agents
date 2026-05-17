@@ -1,0 +1,70 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local", "pnpm-lock.yaml"],
+  "globalEnv": [
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_TABLE_NAME",
+    "SPAM_ASSASSIN_HOST",
+    "SPAM_ASSASSIN_PORT",
+    "PLAYWRIGHT_BROWSERS_PATH"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "^postbuild"],
+      "outputs": ["dist/**"]
+    },
+    "postbuild": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "web#build": {
+      "dependsOn": ["^build", "^postbuild"],
+      "env": [
+        "REDIS_URL",
+        "RESEND_API_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      ],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "@react-email/ui#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "playground#build": {
+      "dependsOn": ["^build", "^postbuild"],
+      "outputs": [".react-email/**", "!.react-email/.next/cache/**"]
+    },
+    "demo#build": {
+      "dependsOn": [
+        "^build",
+        "^postbuild",
+        "@react-email/ui#build",
+        "react-email#build"
+      ],
+      "outputs": [".react-email/**", "!.react-email/.next/cache/**"]
+    },
+    "react-email#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "lint": {},
+    "//#format": {},
+    "//#format:check": {},
+    "test:e2e": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "test:watch": {
+      "cache": false
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
