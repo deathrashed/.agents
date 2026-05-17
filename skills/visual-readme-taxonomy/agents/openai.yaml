@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visual README Taxonomy"
+  short_description: "Generate visual README files with taxonomy audits"
+  default_prompt: "Use $visual-readme-taxonomy to audit this local project and generate a polished README.md."
