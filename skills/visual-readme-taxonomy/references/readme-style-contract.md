@@ -4,13 +4,27 @@ Use this reference while generating the final README.
 
 ## Iconify Syntax
 
-Use Iconify through image URLs so the README works in GitHub-flavored Markdown without scripts:
+Use Iconify through API-generated SVG image URLs so the README works in GitHub-flavored Markdown without scripts:
 
 ```html
 <img src="https://api.iconify.design/lucide:folder-tree.svg?color=%2388C0D0" width="18" height="18" alt="Folder tree icon">
 ```
 
-For centered project headers:
+Use this form for README headings:
+
+```markdown
+## <img src="https://api.iconify.design/lucide:terminal.svg?color=%2306B6D4" width="22" height="22" alt="Terminal icon"> Quick Start
+```
+
+Use this form for table or paragraph accents:
+
+```html
+<img src="https://api.iconify.design/lucide:package-check.svg?color=%238B5CF6" width="18" height="18" alt="Package check icon">
+```
+
+Iconify also documents `<iconify-icon icon="mdi:home"></iconify-icon>` for HTML pages with the Iconify web component available. Do not use that component in GitHub READMEs unless the target renderer supports it. GitHub-safe READMEs should use the API SVG URL pattern above.
+
+For centered project headers, always place the confirmed top icon or banner before the title:
 
 ```html
 <p align="center">
@@ -24,11 +38,11 @@ For local icon assets, prefer HTML images with fixed dimensions:
 
 ```html
 <p align="center">
-  <img src="./assets/icon.svg" width="96" height="96" alt="Project icon">
+  <img src="./assets/project-banner.png" width="620" alt="Project banner">
 </p>
 ```
 
-For dark and light variants:
+Only use dark and light variants when the user confirms both should be included:
 
 ```html
 <picture>
@@ -55,7 +69,7 @@ Choose badge color, logo, and destination based on discovered project context. U
 
 ```markdown
 <p align="center">
-  <img src="ICON" width="96" height="96" alt="PROJECT icon">
+  <img src="ICON" width="620" alt="PROJECT icon">
 </p>
 
 <h1 align="center">PROJECT</h1>
@@ -77,25 +91,25 @@ Choose badge color, logo, and destination based on discovered project context. U
 - [Troubleshooting](#troubleshooting)
 - [Maintenance](#maintenance)
 
-## Overview
+## <img src="https://api.iconify.design/lucide:layers-3.svg?color=%23FF5A52" width="22" height="22" alt="Layers icon"> Overview
 
-## Prerequisites
+## <img src="https://api.iconify.design/lucide:package-check.svg?color=%238B5CF6" width="22" height="22" alt="Package check icon"> Prerequisites
 
-## Installation
+## <img src="https://api.iconify.design/lucide:download.svg?color=%23FF5A52" width="22" height="22" alt="Download icon"> Installation
 
-## Usage
+## <img src="https://api.iconify.design/lucide:terminal.svg?color=%2306B6D4" width="22" height="22" alt="Terminal icon"> Usage
 
-## Configuration
+## <img src="https://api.iconify.design/lucide:settings.svg?color=%238B5CF6" width="22" height="22" alt="Settings icon"> Configuration
 
-## Project Structure
+## <img src="https://api.iconify.design/lucide:folder-tree.svg?color=%2306B6D4" width="22" height="22" alt="Folder tree icon"> Project Structure
 
-## Architecture
+## <img src="https://api.iconify.design/lucide:workflow.svg?color=%238B5CF6" width="22" height="22" alt="Workflow icon"> Architecture
 
-## Taxonomy Notes
+## <img src="https://api.iconify.design/lucide:clipboard-list.svg?color=%23FF5A52" width="22" height="22" alt="Clipboard list icon"> Taxonomy Notes
 
-## Troubleshooting
+## <img src="https://api.iconify.design/lucide:life-buoy.svg?color=%23FF5A52" width="22" height="22" alt="Life buoy icon"> Troubleshooting
 
-## Maintenance
+## <img src="https://api.iconify.design/lucide:wrench.svg?color=%234EAA25" width="22" height="22" alt="Wrench icon"> Maintenance
 ```
 
 Adapt the skeleton to the project. Do not include empty sections.

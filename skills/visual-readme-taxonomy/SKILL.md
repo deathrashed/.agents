@@ -43,6 +43,7 @@ Generate a polished `README.md` for a local project only after inspecting the ta
 
 5. Generate `README.md`.
    - Read `references/readme-style-contract.md` before drafting.
+   - Read `/Users/rd/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian/Iconify Documentation.md` if Iconify syntax or supported rendering modes are unclear.
    - Preserve accurate relative links for the README location.
    - Use project-specific commands discovered from source files, not generic placeholders.
    - Do not overwrite an existing README until you have inspected it and can preserve useful project-specific content.
@@ -51,9 +52,9 @@ Generate a polished `README.md` for a local project only after inspecting the ta
 
 - Use no emojis.
 - Use no raw Unicode symbols for bullets, dividers, visual accents, or status markers.
-- Use Iconify-backed image tags for inline icons and decorative visual accents.
+- Use Iconify-backed icons for inline icons and decorative visual accents. For GitHub READMEs, prefer Iconify API-generated SVG image URLs in `<img>` tags because GitHub does not run arbitrary web components or scripts.
 - Use standard Markdown headings: `##`, `###`, and below.
-- Add a centered header with the confirmed icon and project title.
+- Always add the confirmed top icon or banner inside a centered HTML block before the project title, even when the icon is a local image asset.
 - Add clickable, theme-matched shields/badges below the title.
 - Add a top-level table of contents with anchor links.
 - Add repository-specific sections for prerequisites, installation, usage, configuration, commands, taxonomy, architecture/workflow, troubleshooting, and maintenance.
@@ -62,7 +63,8 @@ Generate a polished `README.md` for a local project only after inspecting the ta
 - Use `<details>` and `<summary>` for verbose configuration, long command lists, large examples, or changelog-like material.
 - Use GitHub alerts for critical setup, destructive commands, platform assumptions, or known limitations.
 - Use strict language tags on all fenced code blocks.
-- Use theme-responsive media via `<picture>` or GitHub dark/light suffixes when embedding local assets with alternate variants.
+- Use only the confirmed top image asset unless the user explicitly asks for dark/light variants.
+- Use theme-responsive media via `<picture>` or GitHub dark/light suffixes only when the user confirms variant assets should be included.
 
 ## Safety
 

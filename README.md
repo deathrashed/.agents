@@ -1,10 +1,8 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/crewai-banner-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/crewai-banner-light.png">
+<p align="center">
   <img src="./assets/crewai-banner.png" alt="CrewAI banner" width="620">
-</picture>
+</p>
 
 <h1 align="center">Agents Workspace</h1>
 
@@ -13,7 +11,7 @@
     <img src="https://img.shields.io/badge/Workspace-.agents-FF5A52?style=for-the-badge&logo=github&logoColor=white&labelColor=202020" alt="Agents workspace">
   </a>
   <a href="#skill-fetch">
-    <img src="https://img.shields.io/badge/Skills-on--demand-8B5CF6?style=for-the-badge&logo=openai&logoColor=white&labelColor=202020" alt="On demand skills">
+    <img src="https://img.shields.io/badge/Skills-on--demand-8B5CF6?style=for-the-badge&logo=openai&logoColor=white&labelColor=202020" alt="On-demand skills">
   </a>
   <a href="#repository-map">
     <img src="https://img.shields.io/badge/Registry-agents%20%7C%20skills%20%7C%20mcp-06B6D4?style=for-the-badge&logo=codecrafters&logoColor=white&labelColor=202020" alt="Registry contents">
@@ -33,7 +31,7 @@
 
 ---
 
-## Overview
+## <img src="https://api.iconify.design/lucide:layers-3.svg?color=%23FF5A52" width="22" height="22" alt="Layers icon"> Overview
 
 This repository is the shared local registry behind the AI-agent tooling on this machine. It keeps the active agent surface small while preserving a large source cache of upstream skills, plugins, prompt packs, MCP server configs, and tests.
 
@@ -54,7 +52,7 @@ The current model is intentionally split:
 > [!IMPORTANT]
 > Treat this repository as an operational workspace, not a normal application package. Many paths are consumed directly by local tools, symlinks, shell scripts, and external agent runtimes.
 
-## Quick Start
+## <img src="https://api.iconify.design/lucide:terminal.svg?color=%2306B6D4" width="22" height="22" alt="Terminal icon"> Quick Start
 
 ```bash
 git clone https://github.com/deathrashed/.agents.git ~/.agents
@@ -79,7 +77,7 @@ skill-fetch clear
 > [!TIP]
 > Use `skill-fetch ui` when `fzf` is available and you want an interactive selector instead of exact-name search.
 
-## Prerequisites
+## <img src="https://api.iconify.design/lucide:package-check.svg?color=%238B5CF6" width="22" height="22" alt="Package check icon"> Prerequisites
 
 | Tool | Why It Matters | Notes |
 | --- | --- | --- |
@@ -91,7 +89,7 @@ skill-fetch clear
 | `fzf` | Powers interactive skill selection. | Optional but recommended. |
 | `python3` | Runs validation and helper scripts in some skills. | Some validators may also need PyYAML. |
 
-## Skill Fetch
+## <img src="https://api.iconify.design/lucide:download.svg?color=%23FF5A52" width="22" height="22" alt="Download icon"> Skill Fetch
 
 `skill-fetch` is the main command surface for keeping startup context lean. It searches the source cache, then symlinks selected skills into the active `skills/` directory.
 
@@ -126,7 +124,7 @@ Indexed items: 4929
 
 </details>
 
-## Repository Map
+## <img src="https://api.iconify.design/lucide:folder-tree.svg?color=%2306B6D4" width="22" height="22" alt="Folder tree icon"> Repository Map
 
 ```text
 ~/.agents/
@@ -162,7 +160,7 @@ Indexed items: 4929
 
 </details>
 
-## Architecture
+## <img src="https://api.iconify.design/lucide:workflow.svg?color=%238B5CF6" width="22" height="22" alt="Workflow icon"> Architecture
 
 ```mermaid
 flowchart TD
@@ -179,7 +177,7 @@ flowchart TD
   L[prompts] --> H
 ```
 
-## Key Workflows
+## <img src="https://api.iconify.design/lucide:repeat-2.svg?color=%234EAA25" width="22" height="22" alt="Repeat icon"> Key Workflows
 
 ### Add or Refresh Skills
 
@@ -210,7 +208,7 @@ tests/claude-code/run-skill-tests.sh
 > [!WARNING]
 > Some test and validation scripts depend on local CLIs, Python packages, or configured agent runtimes. Read each test script before treating a failure as a repository regression.
 
-## Taxonomy Notes
+## <img src="https://api.iconify.design/lucide:clipboard-list.svg?color=%23FF5A52" width="22" height="22" alt="Clipboard list icon"> Taxonomy Notes
 
 This section is an audit trail for organization work. It documents suggested improvements without moving files automatically.
 
@@ -229,7 +227,7 @@ This section is an audit trail for organization work. It documents suggested imp
 > [!CAUTION]
 > Do not bulk-delete archive or generated-looking files from this repository without checking consuming scripts. The registry is wired into local tools by path.
 
-## Documentation Upkeep
+## <img src="https://api.iconify.design/lucide:file-check-2.svg?color=%2306B6D4" width="22" height="22" alt="File check icon"> Documentation Upkeep
 
 When changing directory structure or tool paths, update documentation in the same pass:
 
@@ -247,19 +245,17 @@ Use `rg` to catch stale references after moves:
 rg "skills-fetch|skill-fetch|repos/|_archive|\\.agent\\.md|mdbook" .
 ```
 
-## Visual Media
+## <img src="https://api.iconify.design/lucide:image.svg?color=%238B5CF6" width="22" height="22" alt="Image icon"> Visual Media
 
-The root README uses local CrewAI banner assets:
+The root README uses one local color CrewAI banner asset:
 
 | Asset | Purpose |
 | --- | --- |
-| [`assets/crewai-banner.png`](./assets/crewai-banner.png) | Default banner image. |
-| [`assets/crewai-banner-dark.png`](./assets/crewai-banner-dark.png) | Dark-mode banner source. |
-| [`assets/crewai-banner-light.png`](./assets/crewai-banner-light.png) | Light-mode banner source. |
+| [`assets/crewai-banner.png`](./assets/crewai-banner.png) | Centered top banner image. |
 
 Demo GIFs were skipped for this README pass by request.
 
-## Maintenance
+## <img src="https://api.iconify.design/lucide:wrench.svg?color=%234EAA25" width="22" height="22" alt="Wrench icon"> Maintenance
 
 ### Before Editing
 
@@ -286,7 +282,7 @@ rg "[^ -~]" README.md
 > [!NOTE]
 > The final `rg` command checks this README for non-ASCII characters. This file intentionally keeps visual accents in images, badges, and Iconify-compatible HTML instead of inline Unicode decoration.
 
-## Troubleshooting
+## <img src="https://api.iconify.design/lucide:life-buoy.svg?color=%23FF5A52" width="22" height="22" alt="Life buoy icon"> Troubleshooting
 
 | Symptom | Likely Cause | Check |
 | --- | --- | --- |
@@ -296,7 +292,7 @@ rg "[^ -~]" README.md
 | Validation script fails on `yaml` | PyYAML is missing from the interpreter environment. | Install PyYAML for that interpreter or do a direct frontmatter check. |
 | GitHub Pages build fails | mdBook workflow may not match this repo. | Check `.github/workflows/mdbook.yml` and root docs config. |
 
-## Related Local Paths
+## <img src="https://api.iconify.design/lucide:map-pinned.svg?color=%2306B6D4" width="22" height="22" alt="Map pinned icon"> Related Local Paths
 
 | Path | Relationship |
 | --- | --- |
@@ -305,3 +301,4 @@ rg "[^ -~]" README.md
 | `/usr/local/bin/skill-repo-archive` | Repo-aware archive helper. |
 | `/usr/local/bin/skill-purge-flat` | Flat-skill cleanup helper. |
 | `/Volumes/Apfspace/Icons` | Source of the CrewAI banner and other icon assets. |
+
