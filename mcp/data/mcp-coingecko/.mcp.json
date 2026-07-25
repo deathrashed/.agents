@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "coingecko": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@coingecko/coingecko-mcp",
+        "--client=claude-code",
+        "--resource=coins,global,search,simple*",
+        "--operation=read"
+      ],
+      "env": {
+        "COINGECKO_DEMO_API_KEY": "${COINGECKO_DEMO_API_KEY}",
+        "COINGECKO_ENVIRONMENT": "demo"
+      }
+    }
+  }
+}

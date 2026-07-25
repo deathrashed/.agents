@@ -1,0 +1,20 @@
+{
+  "agent": "vibe",
+  "compatibility": "flat",
+  "description": "9 flat skill files currently used by Vibe",
+  "skills": [
+    "cmux",
+    "cmux-browser",
+    "cmux-customization",
+    "cmux-diagnostics",
+    "cmux-keyboard-shortcuts",
+    "cmux-markdown",
+    "cmux-settings",
+    "cmux-workspace",
+    "find-skills"
+  ],
+  "commands": [],
+  "prompts": [],
+  "plugins": [],
+  "mcp": []
+}

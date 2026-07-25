@@ -1,0 +1,31 @@
+version: 1.0.0
+title: Code Snippet Saver
+description: Save useful code snippets with descriptions and tags so you can quickly recall and reuse them later across projects
+instructions: |-
+  Save useful code snippets with descriptions and tags so you can quickly recall and reuse them later across projects
+
+  ## Example Prompt
+
+  ```markdown
+  Save this retry logic snippet: async function retry(fn, retries=3) { for(let i=0; i<retries; i++) { try { return await fn(); } catch(e) { if(i===retries-1) throw e; } } }
+  ```
+
+  ## Example Result
+
+  ```markdown
+  I'll help you save this retry logic snippet using the memory extension. Let me confirm the details:
+
+  Category
+  Tags
+  Scope
+
+  Would you like me to proceed with saving this snippet?
+  ```
+
+  ## Recommended Extensions
+
+  memory
+
+  Built-in
+activities: []
+parameters: []

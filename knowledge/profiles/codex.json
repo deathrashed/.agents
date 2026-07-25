@@ -1,0 +1,10 @@
+{
+  "agent": "codex",
+  "compatibility": "nested",
+  "description": "192 agent profiles in ~/.codex/agents/ — profile-based, not skill files",
+  "skills": [],
+  "commands": [],
+  "prompts": [],
+  "profiles": true,
+  "mcp": []
+}

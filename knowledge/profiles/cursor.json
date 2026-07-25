@@ -1,0 +1,12 @@
+{
+  "agent": "cursor",
+  "compatibility": "flat",
+  "description": "Single skill (~/.cursor/skills/)",
+  "skills": [
+    "code-reviewer"
+  ],
+  "commands": [],
+  "prompts": [],
+  "plugins": [],
+  "mcp": []
+}

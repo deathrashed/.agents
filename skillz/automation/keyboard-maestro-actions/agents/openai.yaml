@@ -1,0 +1,8 @@
+interface:
+  display_name: "Keyboard Maestro Actions"
+  short_description: "Create, modify, package, and debug Keyboard Maestro plug-in actions"
+  default_prompt: "Use $keyboard-maestro-actions to build a custom Keyboard Maestro action."
+
+policy:
+  allow_implicit_invocation: true
+ 

@@ -1,0 +1,14 @@
+{
+  "name": "mock-data-generator",
+  "version": "1.0.0",
+  "description": "ClaudeForge mock data generator with Faker.js integration, realistic test data, custom generators, and fixture creation",
+  "author": {
+    "name": "ClaudeForge Community",
+    "url": "https://github.com/claudeforge/marketplace"
+  },
+  "keywords": [
+    "claudeforge",
+    "command"
+  ],
+  "homepage": "https://github.com/claudeforge/marketplace/tree/main/plugins/commands/mock-data-generator"
+}

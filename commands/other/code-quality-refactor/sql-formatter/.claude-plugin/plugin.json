@@ -1,0 +1,14 @@
+{
+  "name": "sql-formatter",
+  "version": "1.0.0",
+  "description": "ClaudeForge SQL query formatter with beautification, syntax highlighting, optimization hints, and multiple dialect support",
+  "author": {
+    "name": "ClaudeForge Community",
+    "url": "https://github.com/claudeforge/marketplace"
+  },
+  "keywords": [
+    "claudeforge",
+    "command"
+  ],
+  "homepage": "https://github.com/claudeforge/marketplace/tree/main/plugins/commands/sql-formatter"
+}

@@ -1,0 +1,20 @@
+{
+  "name": "local-personal",
+  "interface": {
+    "displayName": "Personal Plugins"
+  },
+  "plugins": [
+    {
+      "name": "omx-product",
+      "source": {
+        "source": "local",
+        "path": "./.codex/plugins/omx-product"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

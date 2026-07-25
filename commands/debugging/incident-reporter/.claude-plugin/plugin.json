@@ -1,0 +1,14 @@
+{
+  "name": "incident-reporter",
+  "version": "1.0.0",
+  "description": "ClaudeForge incident report generator with root cause analysis, timeline tracking, and post-mortem documentation",
+  "author": {
+    "name": "ClaudeForge Community",
+    "url": "https://github.com/claudeforge/marketplace"
+  },
+  "keywords": [
+    "claudeforge",
+    "command"
+  ],
+  "homepage": "https://github.com/claudeforge/marketplace/tree/main/plugins/commands/incident-reporter"
+}

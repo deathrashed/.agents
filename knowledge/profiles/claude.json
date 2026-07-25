@@ -1,0 +1,12 @@
+{
+  "agent": "claude",
+  "compatibility": "nested",
+  "description": "Full skills set from ~/.claude/skills/ — currently copied from .agents/skills/",
+  "skills": [
+    "all"
+  ],
+  "commands": [],
+  "prompts": [],
+  "plugins": [],
+  "mcp": []
+}

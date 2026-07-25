@@ -1,0 +1,12 @@
+{
+  "agent": "gemini",
+  "compatibility": "nested",
+  "description": "Gemini learns skills via experience — minimal pre-loaded set",
+  "skills": [
+    "learned"
+  ],
+  "commands": [],
+  "prompts": [],
+  "plugins": [],
+  "mcp": []
+}

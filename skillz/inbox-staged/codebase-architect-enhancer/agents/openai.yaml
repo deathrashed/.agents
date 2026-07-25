@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codebase Architect Enhancer"
+  short_description: "Senior technical lead for comprehensive audits and enhancements."
+  default_prompt: "Audit this codebase, suggest refactors, propose architectural paradigm shifts, and identify ecosystem enhancements."
