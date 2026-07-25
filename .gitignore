@@ -52,7 +52,12 @@ _archive/
 
 # Generated cache and index files
 skills-fetch/scan_cache.tsv
+.omo
 .omo/
+.omc
+.omc/
+.oma
+.oma/
 
 # Stale paths from previous repo states
 /.crush
