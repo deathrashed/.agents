@@ -35,6 +35,7 @@ This repository serves as the centralized workspace for AI agent capabilities, r
 
 ## <img src="https://api.iconify.design/lucide:layers-3.svg?color=%238B5CF6" width="22" height="22" alt="Layers icon"> Overview
 
+
 This repository is the shared local registry behind the AI-agent tooling on this machine. It keeps the active agent surface small while preserving a large source cache of upstream skills, plugins, prompt packs, MCP server configs, and tests.
 
 The current model is intentionally split:
