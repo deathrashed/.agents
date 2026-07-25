@@ -304,3 +304,8 @@ rg "[^ -~]" README.md
 | `/usr/local/bin/skill-purge-flat` | Flat-skill cleanup helper. |
 | `/Volumes/Apfspace/Icons` | Source of the CrewAI banner and other icon assets. |
 
+
+
+## <img src="https://api.iconify.design/lucide:brick-wall.svg?color=%238B5CF6" width="22" height="22" alt="brick wall"> LICENCE:  <a href="http://www.wtfpl.net/"><img src="http://www.wtfpl.net/wp-content/uploads/2012/12/wtfpl-badge-4.png" width="" height="26" alt="WTFPL" /></a>
+
+## <a href="http://www.wtfpl.net/"><img src="https://www.wtfpl.net/wp-content/uploads/2012/12/wtfpl.svg" width=""  alt="WTFPL" /></a>
