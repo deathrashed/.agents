@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "maestro": {
+      "command": "node",
+      "args": [
+        "/Users/rd/.gemini/extensions/maestro/mcp/maestro-server.js"
+      ],
+      "cwd": "/Users/rd/.gemini/extensions/maestro",
+      "env": {
+        "MAESTRO_RUNTIME": "gemini",
+        "MAESTRO_WORKSPACE_PATH": "/Users/rd/.local/bin"
+      }
+    }
+  }
+}

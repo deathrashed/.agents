@@ -1,6 +1,6 @@
 # Categorized Skill Source Library (`skillz/`)
 
-This directory serves as the canonical source library for all skill definitions, reference documents, and helper scripts organized into 32 domain category folders.
+This directory serves as the canonical source library for all skill definitions, reference documents, and helper scripts organized into domain category folders.
 
 ---
 
@@ -47,4 +47,5 @@ This directory serves as the canonical source library for all skill definitions,
 
 - **Source Library:** `skillz/` holds the permanent skill code, templates, and reference materials.
 - **Runtime Surface:** `skills/` contains active flat symlinks pointing to items in `skillz/` or `.agents/skills/`.
-- **Search & Load:** Managed via `skill-fetch` command line utility.
+- **Search & Read:** Use the always-on `skillz-discovery` skill to search `skillz/`, plugin-internal `skills/` trees under `plugins/`, and `repos/`, then read the selected `SKILL.md` directly. Do not symlink a skill into `skills/` just to use it.
+- **Optional Activation:** `skill-fetch` remains available for intentionally maintaining the active surface, but it is not required for ordinary skill discovery.

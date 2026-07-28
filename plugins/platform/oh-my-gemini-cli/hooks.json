@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "BeforeModel": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "omg-model-router",
+            "command": "node \"/Users/rd/.gemini/extensions/oh-my-gemini-cli/hooks/scripts/hook-bootstrap.js\" \"/Users/rd/.gemini/extensions/oh-my-gemini-cli/hooks/scripts/before-model-banner.js\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "omg-learn-signal-after-agent",
+            "command": "node \"/Users/rd/.gemini/extensions/oh-my-gemini-cli/hooks/scripts/hook-bootstrap.js\" \"/Users/rd/.gemini/extensions/oh-my-gemini-cli/hooks/scripts/learn.js\"",
+            "timeout": 8000
+          }
+        ]
+      }
+    ]
+  }
+}

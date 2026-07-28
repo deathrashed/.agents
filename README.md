@@ -69,6 +69,16 @@ skill-fetch get react-expert
 skill-fetch status
 ```
 
+For ordinary local skill use, prefer the always-active `skillz-discovery` skill. It searches the curated `skillz/` library, plugin-internal `skills/` trees under `plugins/`, and the broader `repos/` source cache, then reads the selected `SKILL.md` directly. It does not add the selected skill to `skills/`.
+
+Provider runtime links for the migrated Gemini/Antigravity plugin bundles point
+from `~/.config/gemini/extensions/` and
+`~/.config/gemini/antigravity-cli/plugins/` back to their canonical directories
+under `plugins/`. The bundles currently contain skills, agents, and manifests;
+some hook and MCP configs reference runtime JavaScript files that are not
+present locally, so those integrations remain unavailable until their runtime
+files are restored.
+
 When you are done with temporary skills:
 
 ```bash
@@ -92,7 +102,7 @@ skill-fetch clear
 
 ## <img src="https://api.iconify.design/lucide:download.svg?color=%238B5CF6" width="22" height="22" alt="Download icon"> Skill Fetch
 
-`skill-fetch` is the main command surface for keeping startup context lean. It searches the source cache, then symlinks selected skills into the active `skills/` directory.
+`skill-fetch` is the optional command surface for intentionally maintaining the active runtime surface. It searches the source cache and symlinks selected skills into `skills/`; it is not required for ordinary local skill discovery.
 
 | Command | Purpose |
 | --- | --- |

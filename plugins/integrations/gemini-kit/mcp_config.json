@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "kit-agents": {
+      "command": "node",
+      "args": [
+        "/Users/rd/.gemini/extensions/gemini-kit/dist/kit-server.js"
+      ],
+      "cwd": "/Users/rd/.gemini/extensions/gemini-kit",
+      "env": null
+    }
+  }
+}

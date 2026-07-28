@@ -23,6 +23,9 @@ This directory represents the **active runtime skill surface** scanned directly 
    skill-fetch clear
    ```
 
+3. **Direct Local Skill Discovery (`skillz-discovery`):**
+   The always-on `skillz-discovery` skill searches the curated `skillz/` library, plugin-internal `skills/` trees under `plugins/`, and the broader `repos/` source cache. It reads the selected `SKILL.md` directly; it does not symlink or copy the selected skill into this directory.
+
 ---
 
 ## Active Skills Index

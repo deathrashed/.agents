@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "BeforeModel": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "oma-model-router",
+            "command": "node \"/Users/rd/.gemini/extensions/oh-my-antigravity/hooks/scripts/hook-bootstrap.js\" \"/Users/rd/.gemini/extensions/oh-my-antigravity/hooks/scripts/before-model-banner.js\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "oma-learn-signal-after-agent",
+            "command": "node \"/Users/rd/.gemini/extensions/oh-my-antigravity/hooks/scripts/hook-bootstrap.js\" \"/Users/rd/.gemini/extensions/oh-my-antigravity/hooks/scripts/learn.js\"",
+            "timeout": 8000
+          }
+        ]
+      }
+    ]
+  }
+}
