@@ -1,4 +1,4 @@
-![agents-repo.png](https://raw.githubusercontent.com/deathrashed/gupload/main/Uploads/Images/agents-repo.png)
+![graf-banner-agents.png](https://raw.githubusercontent.com/deathrashed/gupload/main/Uploads/Images/graf-banner-agents.png)
 
 # AI Agent Workspace & Architecture (`~/.agents`)
 
@@ -148,7 +148,8 @@ Indexed items: 4929
 |-- plugins/         # Plugin packs by category
 |-- prompts/         # Framework and provider prompt packs by domain
 |-- providers/       # Provider framework symlinks
-|-- skills/          # Active skill surface (flat)
+|-- skills/          # Active skill surface (flat symlinks into skillz/)
+|-- skillz/          # Canonical categorized skill source library
 |-- .agent/          # OpenCode agent configurations
 |-- .omo/            # OMO workflow and plan artifacts
 |-- README.md        # This file
@@ -230,6 +231,7 @@ This section is an audit trail for organization work. It documents suggested imp
 | `plugins/` | Plugin packs by category. | ✅ Categorized (lsp, workflow, code-quality, platform, integrations, examples). | Keep organized; add new plugins to the appropriate category folder. |
 | `prompts/` | Prompt packs by domain. | ✅ Categorized (auth, db-orm, frameworks, meta, ui-styling). | Already well-structured; keep as-is. |
 | `skills/` | Active runtime surface. | Flat symlinks and local skills. | Keep intentionally small; `.gitignore` handles skill-fetch artifacts and repos/. |
+| `skillz/` | Canonical categorized skill library. | 25 domain categories with sub-categories; `inbox-staged/` removed. | Add new skills to the appropriate `skillz/<category>/<sub-category>/` folder. |
 | macOS metadata | `.DS_Store` and `Icon` files. | Handled by `.gitignore`. | `.gitignore` covers standard macOS metadata patterns. |
 
 > [!CAUTION]

@@ -1,308 +1,337 @@
 #!/usr/bin/env python3
-"""Install a skill from a GitHub repo path into $CODEX_HOME/skills."""
+"""
+Install Skill from GitHub - Download and install skills from GitHub repositories
 
-from __future__ import annotations
+Usage:
+    install-skill-from-github.py <owner/repo> [--skill <name>] [--branch <branch>] [--path <path>]
+
+Examples:
+    install-skill-from-github.py vtcode-ai/skills --skill pdf-converter
+    install-skill-from-github.py myuser/my-skills --skill custom-tool --branch main
+    install-skill-from-github.py org/private-skills --skill internal-tool --path skills/private
+
+For private repositories, set GITHUB_TOKEN environment variable.
+"""
 
 import argparse
-from dataclasses import dataclass
+import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.parse
 import zipfile
+from io import BytesIO
+from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError, HTTPError
 
-from github_utils import github_request
-DEFAULT_REF = "main"
-
-
-@dataclass
-class Args:
-    url: str | None = None
-    repo: str | None = None
-    path: list[str] | None = None
-    ref: str = DEFAULT_REF
-    dest: str | None = None
-    name: str | None = None
-    method: str = "auto"
+# Default installation paths
+DEFAULT_SKILLS_PATH = Path.home() / ".agents" / "skills"
+SKILL_FILENAME = "SKILL.md"
 
 
-@dataclass
-class Source:
-    owner: str
-    repo: str
-    ref: str
-    paths: list[str]
-    repo_url: str | None = None
+def get_github_token():
+    """Get GitHub token from environment."""
+    return os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
 
 
-class InstallError(Exception):
-    pass
+def make_github_request(url, token=None):
+    """
+    Make a request to GitHub API or raw content.
 
+    Returns:
+        bytes: Response content
+    """
+    headers = {
+        "User-Agent": "vtcode-skill-installer/1.0",
+        "Accept": "application/vnd.github.v3+json",
+    }
 
-def _codex_home() -> str:
-    return os.environ.get("CODEX_HOME", os.path.expanduser("~/.codex"))
+    if token:
+        headers["Authorization"] = f"token {token}"
 
+    req = Request(url, headers=headers)
 
-def _tmp_root() -> str:
-    base = os.path.join(tempfile.gettempdir(), "codex")
-    os.makedirs(base, exist_ok=True)
-    return base
-
-
-def _request(url: str) -> bytes:
-    return github_request(url, "codex-skill-install")
-
-
-def _parse_github_url(url: str, default_ref: str) -> tuple[str, str, str, str | None]:
-    parsed = urllib.parse.urlparse(url)
-    if parsed.netloc != "github.com":
-        raise InstallError("Only GitHub URLs are supported for download mode.")
-    parts = [p for p in parsed.path.split("/") if p]
-    if len(parts) < 2:
-        raise InstallError("Invalid GitHub URL.")
-    owner, repo = parts[0], parts[1]
-    ref = default_ref
-    subpath = ""
-    if len(parts) > 2:
-        if parts[2] in ("tree", "blob"):
-            if len(parts) < 4:
-                raise InstallError("GitHub URL missing ref or path.")
-            ref = parts[3]
-            subpath = "/".join(parts[4:])
+    try:
+        with urlopen(req, timeout=30) as response:
+            return response.read()
+    except HTTPError as e:
+        if e.code == 404:
+            raise ValueError(f"Not found: {url}")
+        elif e.code == 401:
+            raise ValueError("Authentication required. Set GITHUB_TOKEN environment variable.")
+        elif e.code == 403:
+            raise ValueError("Access denied. Check your GITHUB_TOKEN permissions.")
         else:
-            subpath = "/".join(parts[2:])
-    return owner, repo, ref, subpath or None
+            raise ValueError(f"GitHub API error {e.code}: {e.reason}")
+    except URLError as e:
+        raise ValueError(f"Network error: {e.reason}")
 
 
-def _download_repo_zip(owner: str, repo: str, ref: str, dest_dir: str) -> str:
-    zip_url = f"https://codeload.github.com/{owner}/{repo}/zip/{ref}"
-    zip_path = os.path.join(dest_dir, "repo.zip")
+def list_repo_skills(owner, repo, branch="main", token=None):
+    """
+    List available skills in a repository.
+
+    Returns:
+        list of dict: Skills found in repository
+    """
+    # Try to get repository contents
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/contents?ref={branch}"
+
     try:
-        payload = _request(zip_url)
-    except urllib.error.HTTPError as exc:
-        raise InstallError(f"Download failed: HTTP {exc.code}") from exc
-    with open(zip_path, "wb") as file_handle:
-        file_handle.write(payload)
-    with zipfile.ZipFile(zip_path, "r") as zip_file:
-        _safe_extract_zip(zip_file, dest_dir)
-        top_levels = {name.split("/")[0] for name in zip_file.namelist() if name}
-    if not top_levels:
-        raise InstallError("Downloaded archive was empty.")
-    if len(top_levels) != 1:
-        raise InstallError("Unexpected archive layout.")
-    return os.path.join(dest_dir, next(iter(top_levels)))
+        data = make_github_request(api_url, token)
+        contents = json.loads(data)
+    except ValueError as e:
+        print(f"[WARN] Could not list repository contents: {e}")
+        return []
 
+    skills = []
 
-def _run_git(args: list[str]) -> None:
-    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if result.returncode != 0:
-        raise InstallError(result.stderr.strip() or "Git command failed.")
+    for item in contents:
+        if item.get("type") == "dir":
+            # Check if directory contains SKILL.md
+            dir_name = item["name"]
+            skill_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{dir_name}/{SKILL_FILENAME}?ref={branch}"
 
-
-def _safe_extract_zip(zip_file: zipfile.ZipFile, dest_dir: str) -> None:
-    dest_root = os.path.realpath(dest_dir)
-    for info in zip_file.infolist():
-        extracted_path = os.path.realpath(os.path.join(dest_dir, info.filename))
-        if extracted_path == dest_root or extracted_path.startswith(dest_root + os.sep):
-            continue
-        raise InstallError("Archive contains files outside the destination.")
-    zip_file.extractall(dest_dir)
-
-
-def _validate_relative_path(path: str) -> None:
-    if os.path.isabs(path) or os.path.normpath(path).startswith(".."):
-        raise InstallError("Skill path must be a relative path inside the repo.")
-
-
-def _validate_skill_name(name: str) -> None:
-    altsep = os.path.altsep
-    if not name or os.path.sep in name or (altsep and altsep in name):
-        raise InstallError("Skill name must be a single path segment.")
-    if name in (".", ".."):
-        raise InstallError("Invalid skill name.")
-
-
-def _git_sparse_checkout(repo_url: str, ref: str, paths: list[str], dest_dir: str) -> str:
-    repo_dir = os.path.join(dest_dir, "repo")
-    clone_cmd = [
-        "git",
-        "clone",
-        "--filter=blob:none",
-        "--depth",
-        "1",
-        "--sparse",
-        "--single-branch",
-        "--branch",
-        ref,
-        repo_url,
-        repo_dir,
-    ]
-    try:
-        _run_git(clone_cmd)
-    except InstallError:
-        _run_git(
-            [
-                "git",
-                "clone",
-                "--filter=blob:none",
-                "--depth",
-                "1",
-                "--sparse",
-                "--single-branch",
-                repo_url,
-                repo_dir,
-            ]
-        )
-    _run_git(["git", "-C", repo_dir, "sparse-checkout", "set", *paths])
-    _run_git(["git", "-C", repo_dir, "checkout", ref])
-    return repo_dir
-
-
-def _validate_skill(path: str) -> None:
-    if not os.path.isdir(path):
-        raise InstallError(f"Skill path not found: {path}")
-    skill_md = os.path.join(path, "SKILL.md")
-    if not os.path.isfile(skill_md):
-        raise InstallError("SKILL.md not found in selected skill directory.")
-
-
-def _copy_skill(src: str, dest_dir: str) -> None:
-    os.makedirs(os.path.dirname(dest_dir), exist_ok=True)
-    if os.path.exists(dest_dir):
-        raise InstallError(f"Destination already exists: {dest_dir}")
-    shutil.copytree(src, dest_dir)
-
-
-def _build_repo_url(owner: str, repo: str) -> str:
-    return f"https://github.com/{owner}/{repo}.git"
-
-
-def _build_repo_ssh(owner: str, repo: str) -> str:
-    return f"git@github.com:{owner}/{repo}.git"
-
-
-def _prepare_repo(source: Source, method: str, tmp_dir: str) -> str:
-    if method in ("download", "auto"):
-        try:
-            return _download_repo_zip(source.owner, source.repo, source.ref, tmp_dir)
-        except InstallError as exc:
-            if method == "download":
-                raise
-            err_msg = str(exc)
-            if "HTTP 401" in err_msg or "HTTP 403" in err_msg or "HTTP 404" in err_msg:
+            try:
+                make_github_request(skill_url, token)
+                skills.append({
+                    "name": dir_name,
+                    "path": dir_name,
+                })
+            except ValueError:
+                # Not a skill directory
                 pass
-            else:
-                raise
-    if method in ("git", "auto"):
-        repo_url = source.repo_url or _build_repo_url(source.owner, source.repo)
-        try:
-            return _git_sparse_checkout(repo_url, source.ref, source.paths, tmp_dir)
-        except InstallError:
-            repo_url = _build_repo_ssh(source.owner, source.repo)
-            return _git_sparse_checkout(repo_url, source.ref, source.paths, tmp_dir)
-    raise InstallError("Unsupported method.")
+
+    # Also check root for SKILL.md
+    root_skill_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{SKILL_FILENAME}?ref={branch}"
+    try:
+        make_github_request(root_skill_url, token)
+        skills.insert(0, {
+            "name": repo,
+            "path": ".",
+        })
+    except ValueError:
+        pass
+
+    return skills
 
 
-def _resolve_source(args: Args) -> Source:
-    if args.url:
-        owner, repo, ref, url_path = _parse_github_url(args.url, args.ref)
-        if args.path is not None:
-            paths = list(args.path)
-        elif url_path:
-            paths = [url_path]
+def download_skill(owner, repo, skill_path, branch="main", token=None):
+    """
+    Download a skill from GitHub.
+
+    Returns:
+        Path: Temporary directory containing the skill
+    """
+    # Download repository as zip
+    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch}.zip"
+
+    print(f"[INFO] Downloading from {owner}/{repo}...")
+
+    try:
+        data = make_github_request(zip_url, token)
+    except ValueError as e:
+        raise ValueError(f"Failed to download repository: {e}")
+
+    # Extract to temp directory
+    temp_dir = tempfile.mkdtemp(prefix="vtcode-skill-")
+
+    try:
+        with zipfile.ZipFile(BytesIO(data)) as zf:
+            zf.extractall(temp_dir)
+    except zipfile.BadZipFile:
+        shutil.rmtree(temp_dir)
+        raise ValueError("Downloaded file is not a valid zip archive")
+
+    # Find extracted directory (usually repo-branch)
+    extracted_dirs = [d for d in Path(temp_dir).iterdir() if d.is_dir()]
+    if not extracted_dirs:
+        shutil.rmtree(temp_dir)
+        raise ValueError("No directories found in downloaded archive")
+
+    extracted_dir = extracted_dirs[0]
+
+    # Find skill within extracted directory
+    if skill_path == ".":
+        skill_dir = extracted_dir
+    else:
+        skill_dir = extracted_dir / skill_path
+
+    if not skill_dir.exists():
+        shutil.rmtree(temp_dir)
+        raise ValueError(f"Skill path not found: {skill_path}")
+
+    if not (skill_dir / SKILL_FILENAME).exists():
+        shutil.rmtree(temp_dir)
+        raise ValueError(f"No {SKILL_FILENAME} found in {skill_path}")
+
+    return temp_dir, skill_dir
+
+
+def validate_skill(skill_dir):
+    """
+    Basic validation of downloaded skill.
+
+    Returns:
+        tuple: (is_valid, skill_name, errors)
+    """
+    skill_md = skill_dir / SKILL_FILENAME
+    if not skill_md.exists():
+        return False, None, [f"{SKILL_FILENAME} not found"]
+
+    content = skill_md.read_text(encoding="utf-8")
+
+    # Parse frontmatter
+    import re
+
+    frontmatter_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+    if not frontmatter_match:
+        return False, None, ["Missing YAML frontmatter"]
+
+    frontmatter = frontmatter_match.group(1)
+    name = None
+
+    for line in frontmatter.split("\n"):
+        if line.startswith("name:"):
+            name = line.split(":", 1)[1].strip().strip("\"'")
+            break
+
+    if not name:
+        return False, None, ["Missing 'name' field in frontmatter"]
+
+    return True, name, []
+
+
+def install_skill(skill_dir, install_path, skill_name, force=False):
+    """
+    Install skill to target directory.
+
+    Returns:
+        Path: Installation path
+    """
+    target_dir = install_path / skill_name
+
+    if target_dir.exists():
+        if force:
+            print(f"[WARN] Overwriting existing skill: {skill_name}")
+            shutil.rmtree(target_dir)
         else:
-            paths = []
-        if not paths:
-            raise InstallError("Missing --path for GitHub URL.")
-        return Source(owner=owner, repo=repo, ref=ref, paths=paths)
+            raise ValueError(
+                f"Skill already exists: {target_dir}\n"
+                "Use --force to overwrite."
+            )
 
-    if not args.repo:
-        raise InstallError("Provide --repo or --url.")
-    if "://" in args.repo:
-        return _resolve_source(
-            Args(url=args.repo, repo=None, path=args.path, ref=args.ref)
-        )
+    # Copy skill files
+    shutil.copytree(skill_dir, target_dir)
 
-    repo_parts = [p for p in args.repo.split("/") if p]
-    if len(repo_parts) != 2:
-        raise InstallError("--repo must be in owner/repo format.")
-    if not args.path:
-        raise InstallError("Missing --path for --repo.")
-    paths = list(args.path)
-    return Source(
-        owner=repo_parts[0],
-        repo=repo_parts[1],
-        ref=args.ref,
-        paths=paths,
+    return target_dir
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Install skills from GitHub repositories.",
     )
-
-
-def _default_dest() -> str:
-    return os.path.join(_codex_home(), "skills")
-
-
-def _parse_args(argv: list[str]) -> Args:
-    parser = argparse.ArgumentParser(description="Install a skill from GitHub.")
-    parser.add_argument("--repo", help="owner/repo")
-    parser.add_argument("--url", help="https://github.com/owner/repo[/tree/ref/path]")
+    parser.add_argument(
+        "repo",
+        help="GitHub repository in owner/repo format",
+    )
+    parser.add_argument(
+        "--skill",
+        "-s",
+        help="Skill name/path within repository (default: list available)",
+    )
+    parser.add_argument(
+        "--branch",
+        "-b",
+        default="main",
+        help="Git branch (default: main)",
+    )
     parser.add_argument(
         "--path",
-        nargs="+",
-        help="Path(s) to skill(s) inside repo",
-    )
-    parser.add_argument("--ref", default=DEFAULT_REF)
-    parser.add_argument("--dest", help="Destination skills directory")
-    parser.add_argument(
-        "--name", help="Destination skill name (defaults to basename of path)"
+        "-p",
+        help=f"Installation path (default: {DEFAULT_SKILLS_PATH})",
     )
     parser.add_argument(
-        "--method",
-        choices=["auto", "download", "git"],
-        default="auto",
+        "--force",
+        "-f",
+        action="store_true",
+        help="Overwrite existing skill",
     )
-    return parser.parse_args(argv, namespace=Args())
+    parser.add_argument(
+        "--list",
+        "-l",
+        action="store_true",
+        help="List skills in repository without installing",
+    )
+    args = parser.parse_args()
 
+    # Parse repository
+    if "/" not in args.repo:
+        print("[ERROR] Repository must be in owner/repo format")
+        sys.exit(1)
 
-def main(argv: list[str]) -> int:
-    args = _parse_args(argv)
+    owner, repo = args.repo.split("/", 1)
+    token = get_github_token()
+
+    if token:
+        print("[INFO] Using GitHub token for authentication")
+
+    # List mode
+    if args.list or not args.skill:
+        print(f"[INFO] Listing skills in {owner}/{repo}...")
+        skills = list_repo_skills(owner, repo, args.branch, token)
+
+        if not skills:
+            print("[INFO] No skills found in repository")
+            print("   Make sure the repository contains directories with SKILL.md files")
+            sys.exit(0)
+
+        print(f"\nFound {len(skills)} skill(s):\n")
+        for skill in skills:
+            print(f"  {skill['name']}")
+
+        print("\nTo install:")
+        print(f"  install-skill-from-github.py {args.repo} --skill <name>")
+        sys.exit(0)
+
+    # Install mode
+    skill_path = args.skill
+    install_path = Path(args.path) if args.path else DEFAULT_SKILLS_PATH
+
+    # Ensure install path exists
+    install_path.mkdir(parents=True, exist_ok=True)
+
+    temp_dir = None
     try:
-        source = _resolve_source(args)
-        source.ref = source.ref or args.ref
-        if not source.paths:
-            raise InstallError("No skill paths provided.")
-        for path in source.paths:
-            _validate_relative_path(path)
-        dest_root = args.dest or _default_dest()
-        tmp_dir = tempfile.mkdtemp(prefix="skill-install-", dir=_tmp_root())
-        try:
-            repo_root = _prepare_repo(source, args.method, tmp_dir)
-            installed = []
-            for path in source.paths:
-                skill_name = args.name if len(source.paths) == 1 else None
-                skill_name = skill_name or os.path.basename(path.rstrip("/"))
-                _validate_skill_name(skill_name)
-                if not skill_name:
-                    raise InstallError("Unable to derive skill name.")
-                dest_dir = os.path.join(dest_root, skill_name)
-                if os.path.exists(dest_dir):
-                    raise InstallError(f"Destination already exists: {dest_dir}")
-                skill_src = os.path.join(repo_root, path)
-                _validate_skill(skill_src)
-                _copy_skill(skill_src, dest_dir)
-                installed.append((skill_name, dest_dir))
-        finally:
-            if os.path.isdir(tmp_dir):
-                shutil.rmtree(tmp_dir, ignore_errors=True)
-        for skill_name, dest_dir in installed:
-            print(f"Installed {skill_name} to {dest_dir}")
-        return 0
-    except InstallError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+        # Download skill
+        temp_dir, skill_dir = download_skill(owner, repo, skill_path, args.branch, token)
+
+        # Validate
+        is_valid, skill_name, errors = validate_skill(skill_dir)
+        if not is_valid:
+            print(f"[ERROR] Invalid skill: {', '.join(errors)}")
+            sys.exit(1)
+
+        print(f"[OK] Validated skill: {skill_name}")
+
+        # Install
+        installed_path = install_skill(skill_dir, install_path, skill_name, args.force)
+        print(f"[OK] Installed to: {installed_path}")
+
+        print("\nSkill installed successfully!")
+        print(f"   Name: {skill_name}")
+        print(f"   Path: {installed_path}")
+
+    except ValueError as e:
+        print(f"[ERROR] {e}")
+        sys.exit(1)
+
+    finally:
+        # Cleanup temp directory
+        if temp_dir and Path(temp_dir).exists():
+            shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    main()

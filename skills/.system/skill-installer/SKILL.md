@@ -1,58 +1,107 @@
 ---
 name: skill-installer
-description: Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).
+description: Install VT Code skills into ~/.agents/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo, including private repos.
 metadata:
-  short-description: Install curated skills from openai/skills or other repos
+    short-description: Install curated skills from openai/skills or other repos
 ---
 
 # Skill Installer
 
-Helps install skills. By default these are from https://github.com/openai/skills/tree/main/skills/.curated, but users can also provide other locations. Experimental skills live in https://github.com/openai/skills/tree/main/skills/.experimental and can be installed the same way.
+Helps install skills. By default these are from https://github.com/openai/skills/tree/main/skills/.curated, but users can also provide other locations.
 
 Use the helper scripts based on the task:
-- List skills when the user asks what is available, or if the user uses this skill without specifying what to do. Default listing is `.curated`, but you can pass `--path skills/.experimental` when they ask about experimental skills.
-- Install from the curated list when the user provides a skill name.
-- Install from another repo when the user provides a GitHub repo/path (including private repos).
+
+-   List curated skills when the user asks what is available, or if the user uses this skill without specifying what to do.
+-   Install from the curated list when the user provides a skill name.
+-   Install from another repo when the user provides a GitHub repo/path (including private repos).
 
 Install skills with the helper scripts.
 
 ## Communication
 
-When listing skills, output approximately as follows, depending on the context of the user's request. If they ask about experimental skills, list from `.experimental` instead of `.curated` and label the source accordingly:
-"""
-Skills from {repo}:
-1. skill-1
-2. skill-2 (already installed)
-3. ...
-Which ones would you like installed?
-"""
-
-After installing a skill, tell the user: "Restart Codex to pick up new skills."
+-   Start by confirming the task and running the appropriate command.
+-   If something fails, report the exact error and ask what to do next.
+-   Say only what is necessary.
 
 ## Scripts
 
-All of these scripts use network, so when running in the sandbox, request escalation when running them.
+### List Curated Skills
 
-- `scripts/list-skills.py` (prints skills list with installed annotations)
-- `scripts/list-skills.py --format json`
-- Example (experimental list): `scripts/list-skills.py --path skills/.experimental`
-- `scripts/install-skill-from-github.py --repo <owner>/<repo> --path <path/to/skill> [<path/to/skill> ...]`
-- `scripts/install-skill-from-github.py --url https://github.com/<owner>/<repo>/tree/<ref>/<path>`
-- Example (experimental skill): `scripts/install-skill-from-github.py --repo openai/skills --path skills/.experimental/<skill-name>`
+Show available skills from the curated list:
+
+```bash
+scripts/list-curated-skills.py
+```
+
+Optional: specify a different repo or path:
+
+```bash
+scripts/list-curated-skills.py --repo owner/repo --path skills/path --ref branch
+```
+
+Output formats:
+
+-   Default: numbered list with installation status
+-   JSON: `--format json` for programmatic use
+
+### Install from Curated List
+
+Install a skill by name from the curated list:
+
+```bash
+scripts/install-skill-from-github.py <skill-name>
+```
+
+The skill will be installed to `~/.agents/skills/<skill-name>/`.
+
+### Install from Any GitHub Repo
+
+Install skills from any GitHub repository:
+
+```bash
+scripts/install-skill-from-github.py owner/repo path/to/skill
+```
+
+For private repos, ensure `gh` CLI is authenticated or `GITHUB_TOKEN` is set.
+
+Install multiple skills from the same repo:
+
+```bash
+scripts/install-skill-from-github.py owner/repo path/to/skill1 path/to/skill2
+```
 
 ## Behavior and Options
 
-- Defaults to direct download for public GitHub repos.
-- If download fails with auth/permission errors, falls back to git sparse checkout.
-- Aborts if the destination skill directory already exists.
-- Installs into `$CODEX_HOME/skills/<skill-name>` (defaults to `~/.codex/skills`).
-- Multiple `--path` values install multiple skills in one run, each named from the path basename unless `--name` is supplied.
-- Options: `--ref <ref>` (default `main`), `--dest <path>`, `--method auto|download|git`.
+### Installation Location
+
+Skills are installed to `~/.agents/skills/` by default.
+
+### Private Repositories
+
+For private repositories:
+
+1. Ensure GitHub CLI (`gh`) is installed and authenticated: `gh auth login`
+2. Or set the `GITHUB_TOKEN` environment variable
+
+### Overwriting Existing Skills
+
+If a skill with the same name already exists, the installer will:
+
+1. Warn about the existing skill
+2. Ask for confirmation before overwriting
+3. Back up the existing skill before replacement
+
+### Validation
+
+Before installing, the script validates:
+
+-   SKILL.md exists and has valid frontmatter
+-   Skill name follows naming conventions
+-   No invalid or dangerous file patterns
 
 ## Notes
 
-- Curated listing is fetched from `https://github.com/openai/skills/tree/main/skills/.curated` via the GitHub API. If it is unavailable, explain the error and exit.
-- Private GitHub repos can be accessed via existing git credentials or optional `GITHUB_TOKEN`/`GH_TOKEN` for download.
-- Git fallback tries HTTPS first, then SSH.
-- The skills at https://github.com/openai/skills/tree/main/skills/.system are preinstalled, so no need to help users install those. If they ask, just explain this. If they insist, you can download and overwrite.
-- Installed annotations come from `$CODEX_HOME/skills`.
+-   Skills installed from GitHub are placed in the User scope.
+-   After installation, the skill is immediately available in the current session.
+-   Use `/skills list` to verify installation.
+-   Use `/skills load <skill-name>` to activate the skill.

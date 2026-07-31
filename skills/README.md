@@ -7,7 +7,7 @@ This directory represents the **active runtime skill surface** scanned directly 
 ## Operating Model
 
 1. **Lean Active Surface:**
-   To keep context window usage optimal, `skills/` contains only the active skills currently loaded for active coding tasks (58 active skills).
+   To keep context window usage optimal, `skills/` contains only the active skills currently loaded for active coding tasks, as flat symlinks into `skillz/`.
 
 2. **On-Demand Skill Fetching (`skill-fetch`):**
    Skills are stored in the canonical category library [`skillz/`](../skillz) or the specialized OMA suite [`.agents/skills/`](../.agents/skills).
@@ -23,7 +23,7 @@ This directory represents the **active runtime skill surface** scanned directly 
    skill-fetch clear
    ```
 
-3. **Direct Local Skill Discovery (`skillz-discovery`):**
+4. **Direct Local Skill Discovery (`skillz-discovery`):**
    The always-on `skillz-discovery` skill searches the curated `skillz/` library, plugin-internal `skills/` trees under `plugins/`, and the broader `repos/` source cache. It reads the selected `SKILL.md` directly; it does not symlink or copy the selected skill into this directory.
 
 ---
