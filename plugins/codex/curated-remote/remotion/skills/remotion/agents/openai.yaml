@@ -1,0 +1,5 @@
+interface:
+  display_name: "Remotion"
+  short_description: "Create motion graphics from prompts"
+  brand_color: "#0B84F3"
+  default_prompt: "Create a Remotion video animation."

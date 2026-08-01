@@ -3,19 +3,22 @@
 Skill Initializer - Creates a new skill from template
 
 Usage:
-    init_skill.py <skill-name> --path <path> [--resources scripts,references,assets] [--examples]
+    init_skill.py <skill-name> --path <path> [--resources scripts,references,assets] [--examples] [--interface key=value]
 
 Examples:
     init_skill.py my-new-skill --path skills/public
     init_skill.py my-new-skill --path skills/public --resources scripts,references
     init_skill.py my-api-helper --path skills/private --resources scripts --examples
     init_skill.py custom-skill --path /custom/location
+    init_skill.py my-skill --path skills/public --interface short_description="Short UI label"
 """
 
 import argparse
 import re
 import sys
 from pathlib import Path
+
+from generate_openai_yaml import write_openai_yaml
 
 MAX_SKILL_NAME_LENGTH = 64
 ALLOWED_RESOURCES = {"scripts", "references", "assets"}
@@ -72,36 +75,55 @@ Delete this entire "Structuring This Skill" section when done - it's just guidan
 Create only the resource directories this skill actually needs. Delete this section if no resources are required.
 
 ### scripts/
+Executable code (Python/Bash/etc.) that can be run directly to perform specific operations.
 
-Executable code for deterministic, repeatable tasks. Use when the same code is being rewritten repeatedly.
+**Examples from other skills:**
+- PDF skill: `fill_fillable_fields.py`, `extract_form_field_info.py` - utilities for PDF manipulation
+- DOCX skill: `document.py`, `utilities.py` - Python modules for document processing
+
+**Appropriate for:** Python scripts, shell scripts, or any executable code that performs automation, data processing, or specific operations.
+
+**Note:** Scripts may be executed without loading into context, but can still be read by Codex for patching or environment adjustments.
 
 ### references/
+Documentation and reference material intended to be loaded into context to inform Codex's process and thinking.
 
-Documentation loaded into context as needed. Use for detailed reference material, schemas, examples.
+**Examples from other skills:**
+- Product management: `communication.md`, `context_building.md` - detailed workflow guides
+- BigQuery: API reference documentation and query examples
+- Finance: Schema documentation, company policies
+
+**Appropriate for:** In-depth documentation, API references, database schemas, comprehensive guides, or any detailed information that Codex should reference while working.
 
 ### assets/
+Files not intended to be loaded into context, but rather used within the output Codex produces.
 
-Files used in output (not loaded into context). Use for templates, images, boilerplate code.
+**Examples from other skills:**
+- Brand styling: PowerPoint template files (.pptx), logo files
+- Frontend builder: HTML/React boilerplate project directories
+- Typography: Font files (.ttf, .woff2)
+
+**Appropriate for:** Templates, boilerplate code, document templates, images, icons, fonts, or any files meant to be copied or used in the final output.
+
+---
+
+**Not every skill requires all three types of resources.**
 """
 
 EXAMPLE_SCRIPT = '''#!/usr/bin/env python3
 """
-Example script for {skill_title}
+Example helper script for {skill_name}
 
-This is a placeholder script. Replace with actual functionality.
+This is a placeholder script that can be executed directly.
+Replace with actual implementation or delete if not needed.
 
-Usage:
-    python scripts/example_script.py [arguments]
+Example real scripts from other skills:
+- pdf/scripts/fill_fillable_fields.py - Fills PDF form fields
+- pdf/scripts/convert_pdf_to_images.py - Converts PDF pages to images
 """
 
-import sys
-
-
 def main():
-    """Main entry point."""
-    print("Hello from {skill_name} skill!")
-    print(f"Arguments: {{sys.argv[1:]}}")
-
+    print("This is an example script for {skill_name}")
     # TODO: Add actual script logic here
     # This could be data processing, file conversion, API calls, etc.
 
@@ -151,7 +173,7 @@ This placeholder represents where asset files would be stored.
 Replace with actual asset files (templates, images, fonts, etc.) or delete if not needed.
 
 Asset files are NOT intended to be loaded into context, but rather used within
-the output the agent produces.
+the output Codex produces.
 
 Example asset files from other skills:
 - Brand guidelines: logo.png, slides_template.pptx
@@ -174,17 +196,11 @@ Note: This is a text placeholder. Actual assets can be any file type.
 
 def normalize_skill_name(skill_name):
     """Normalize a skill name to lowercase hyphen-case."""
-    # Convert to lowercase
-    name = skill_name.lower()
-    # Replace spaces, underscores with hyphens
-    name = re.sub(r"[\s_]+", "-", name)
-    # Remove any non-alphanumeric characters except hyphens
-    name = re.sub(r"[^a-z0-9-]", "", name)
-    # Remove consecutive hyphens
-    name = re.sub(r"-+", "-", name)
-    # Remove leading/trailing hyphens
-    name = name.strip("-")
-    return name
+    normalized = skill_name.strip().lower()
+    normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
+    normalized = normalized.strip("-")
+    normalized = re.sub(r"-{2,}", "-", normalized)
+    return normalized
 
 
 def title_case_skill_name(skill_name):
@@ -193,46 +209,53 @@ def title_case_skill_name(skill_name):
 
 
 def parse_resources(raw_resources):
-    """Parse comma-separated resource list."""
     if not raw_resources:
         return []
-    resources = [r.strip().lower() for r in raw_resources.split(",")]
-    invalid = set(resources) - ALLOWED_RESOURCES
+    resources = [item.strip() for item in raw_resources.split(",") if item.strip()]
+    invalid = sorted({item for item in resources if item not in ALLOWED_RESOURCES})
     if invalid:
-        print(f"[ERROR] Invalid resource types: {', '.join(invalid)}")
-        print(f"   Allowed: {', '.join(sorted(ALLOWED_RESOURCES))}")
+        allowed = ", ".join(sorted(ALLOWED_RESOURCES))
+        print(f"[ERROR] Unknown resource type(s): {', '.join(invalid)}")
+        print(f"   Allowed: {allowed}")
         sys.exit(1)
-    return resources
+    deduped = []
+    seen = set()
+    for resource in resources:
+        if resource not in seen:
+            deduped.append(resource)
+            seen.add(resource)
+    return deduped
 
 
 def create_resource_dirs(skill_dir, skill_name, skill_title, resources, include_examples):
-    """Create resource directories with optional example files."""
     for resource in resources:
         resource_dir = skill_dir / resource
-        resource_dir.mkdir(parents=True, exist_ok=True)
-        print(f"[OK] Created {resource}/ directory")
+        resource_dir.mkdir(exist_ok=True)
+        if resource == "scripts":
+            if include_examples:
+                example_script = resource_dir / "example.py"
+                example_script.write_text(EXAMPLE_SCRIPT.format(skill_name=skill_name))
+                example_script.chmod(0o755)
+                print("[OK] Created scripts/example.py")
+            else:
+                print("[OK] Created scripts/")
+        elif resource == "references":
+            if include_examples:
+                example_reference = resource_dir / "api_reference.md"
+                example_reference.write_text(EXAMPLE_REFERENCE.format(skill_title=skill_title))
+                print("[OK] Created references/api_reference.md")
+            else:
+                print("[OK] Created references/")
+        elif resource == "assets":
+            if include_examples:
+                example_asset = resource_dir / "example_asset.txt"
+                example_asset.write_text(EXAMPLE_ASSET)
+                print("[OK] Created assets/example_asset.txt")
+            else:
+                print("[OK] Created assets/")
 
-        if include_examples:
-            if resource == "scripts":
-                script_path = resource_dir / "example_script.py"
-                content = EXAMPLE_SCRIPT.format(
-                    skill_name=skill_name, skill_title=skill_title
-                )
-                script_path.write_text(content)
-                script_path.chmod(0o755)
-                print(f"   Created example: {script_path.name}")
-            elif resource == "references":
-                ref_path = resource_dir / "example_reference.md"
-                content = EXAMPLE_REFERENCE.format(skill_title=skill_title)
-                ref_path.write_text(content)
-                print(f"   Created example: {ref_path.name}")
-            elif resource == "assets":
-                asset_path = resource_dir / "README.md"
-                asset_path.write_text(EXAMPLE_ASSET)
-                print(f"   Created example: {asset_path.name}")
 
-
-def init_skill(skill_name, path, resources, include_examples):
+def init_skill(skill_name, path, resources, include_examples, interface_overrides):
     """
     Initialize a new skill directory with template SKILL.md.
 
@@ -273,6 +296,15 @@ def init_skill(skill_name, path, resources, include_examples):
         print(f"[ERROR] Error creating SKILL.md: {e}")
         return None
 
+    # Create agents/openai.yaml
+    try:
+        result = write_openai_yaml(skill_dir, skill_name, interface_overrides)
+        if not result:
+            return None
+    except Exception as e:
+        print(f"[ERROR] Error creating agents/openai.yaml: {e}")
+        return None
+
     # Create resource directories if requested
     if resources:
         try:
@@ -287,11 +319,16 @@ def init_skill(skill_name, path, resources, include_examples):
     print("1. Edit SKILL.md to complete the TODO items and update the description")
     if resources:
         if include_examples:
-            print("2. Replace or delete the example files in resource directories")
-            print("3. Add your actual scripts, references, or assets")
+            print("2. Customize or delete the example files in scripts/, references/, and assets/")
         else:
-            print("2. Add scripts, references, or assets to the resource directories")
-    print("\nWhen done, package with: scripts/package_skill.py <path/to/skill>")
+            print("2. Add resources to scripts/, references/, and assets/ as needed")
+    else:
+        print("2. Create resource directories only if needed (scripts/, references/, assets/)")
+    print("3. Update agents/openai.yaml if the UI metadata should differ")
+    print("4. Run the validator when ready to check the skill structure")
+    print(
+        "5. Forward-test complex skills with realistic user requests to ensure they work as intended"
+    )
 
     return skill_dir
 
@@ -311,6 +348,12 @@ def main():
         "--examples",
         action="store_true",
         help="Create example files inside the selected resource directories",
+    )
+    parser.add_argument(
+        "--interface",
+        action="append",
+        default=[],
+        help="Interface override in key=value format (repeatable)",
     )
     args = parser.parse_args()
 
@@ -345,7 +388,7 @@ def main():
         print("   Resources: none (create as needed)")
     print()
 
-    result = init_skill(skill_name, path, resources, args.examples)
+    result = init_skill(skill_name, path, resources, args.examples, args.interface)
 
     if result:
         sys.exit(0)
