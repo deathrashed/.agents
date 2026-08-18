@@ -55,38 +55,60 @@ scheme. Treat renames as an explicit refactor with user approval.
 
 ### Preferred long-term pattern
 
-This skill still prefers a clean split:
-- Executable scripts: shell-friendly names
-- Documentation files: Smart Sentence Case
+Executables and documentation follow different conventions:
 
-But the live repo may contain mixed conventions. Preserve working paths unless
-the task is explicitly about naming cleanup.
+- **Executable scripts** use their language's idiomatic casing (see below).
+- **Documentation files** use Smart Sentence Case, with lowercase allowed where
+  a project already uses it (`README.md`, `DESIGN.md`, `docs/tui.md`).
+- **Directories** use lowercase (new directories only — migration deferred).
 
-### Script files → kebab-case
-All executable scripts use kebab-case regardless of language. Spaces in
-filenames cause constant escaping problems in shell and automation tools.
+The live repo contains mixed conventions from before this rule was settled.
+Preserve working paths unless the task is explicitly about naming cleanup.
+Do not mass-rename existing scripts; apply the rules to new files going forward.
+
+### Script files → language-idiomatic casing
+Script filenames follow the idiomatic convention of their language, not one
+universal style. Spaces are always avoided in executable filenames because they
+cause escaping problems in shell and automation tools.
+
+| Language | Convention | Example |
+|----------|-----------|---------|
+| Shell / Zsh / Bash / JS / TS | kebab-case | `get-current-weather.sh` |
+| Python | snake_case (new files only) | `get_current_weather.py` |
+| Ruby / Go / Nim | snake_case | `get_current_weather.go` |
+| Swift | idiomatic (PascalCase types, snake_case scripts) | `WeatherClient.swift` |
+| AppleScript / JXA | kebab-case | `extract-urls-from-text.applescript` |
 
 ```
+get-current-weather.sh            ✓
+get_current_weather.py            ✓  (Python: snake_case)
 extract-urls-from-text.applescript  ✓
-extract_urls_from_text.applescript  ✗  (snake_case)
-Extract URLs from Text.applescript  ✗  (spaces)
+Extract URLs from Text.sh         ✗  (spaces)
+getCurrentWeather.sh              ✗  (camelCase)
 ```
 
-### Documentation files → Smart Sentence Case
-All `.md` files use Smart Sentence Case — the readable, menu-command name.
+**Grandfathering**: Python scripts that predate this rule may still be
+kebab-case. Do not rename them — snake_case applies to new Python files only.
+
+### Documentation files → Smart Sentence Case (or lowercase)
+All `.md` files use Smart Sentence Case by default — the readable, menu-command
+name. Lowercase is acceptable where a project already uses it (`README.md`,
+`DESIGN.md`, `docs/tui.md`, `docs/modes.md`).
 
 ```
 Extract URLs from Text.md  ✓
-extract-urls-from-text.md  ✗
+README.md                  ✓  (project convention)
+extract-urls-from-text.md  ✗  (unless the project already uses lowercase)
 ```
 
-### Kebab → Doc name conversion (mechanical rule)
-Strip extension → split on hyphens → apply Smart Sentence Case → uppercase
-acronyms → add `.md`
+### Script → Doc name conversion (mechanical rule)
+Strip extension → split on hyphens/underscores → apply Smart Sentence Case →
+uppercase acronyms → add `.md`
 
 ```
 extract-urls-from-text.applescript  →  Extract URLs from Text.md
 convert-json-to-csv.py              →  Convert JSON to CSV.md
+get_current_weather.py              →  Get Current Weather.md
 get-current-weather.sh              →  Get Current Weather.md
 run-ocr-on-image.sh                 →  Run OCR on Image.md
 ```
@@ -108,7 +130,7 @@ These belong in script headers and docs — not the filename:
 - Output destination (Desktop, Temp)
 - UI hints (Dialog, Popup)
 
-### Existing bad names — what to do
+### Existing bad names — what to docamelCase, or wrong casing for its languag
 If a script already has a bad name (spaces, snake_case, wrong case):
 1. **Suggest the rename to the user** before documenting
 2. If approved: rename the script file, update any references, then document
@@ -525,9 +547,10 @@ cp "Script Name.md" "$VAULT/Category/Script Name.md"
 > This script modifies or deletes files. Test on sample data first.
 ```
 
-### Kebab → Doc name (quick examples)
+### Script → Doc name (quick examples)
 ```
 get-current-weather.sh       →  Get Current Weather.md
+get_current_weather.py       →  Get Current Weather.md
 extract-urls-from-text.sh    →  Extract URLs from Text.md
 convert-json-to-csv.py       →  Convert JSON to CSV.md
 run-ocr-on-image.applescript →  Run OCR on Image.md
@@ -539,7 +562,7 @@ upload-to-imgur.sh           →  Upload to Imgur.md
 
 ## Critical Rules (summary)
 
-1. **Naming**: script files kebab-case, doc files Smart Sentence Case — always
+1. **Naming**: scripts language-idiomatic (kebab default, snake_case for Python/Ruby/Go), docs Smart Sentence Case or project lowercase
 2. **Action taxonomy**: every script name leads with an approved action verb
 3. **Bad names**: surface to user, get approval, rename, then document
 4. **`∗new/`**: sort before documenting — no exceptions
